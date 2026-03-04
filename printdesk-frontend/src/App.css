@@ -1,0 +1,107 @@
+/* Global layout */
+/* app.css */
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+#root {
+  min-height: 100vh;
+  }
+
+main {
+  min-height: 100vh;
+  }
+
+/* Landing / marketing */
+.hero {
+  min-height: 70vh;
+  background-size: cover;
+  background-position: center;
+}
+
+.feature-card h5 {
+  font-weight: 600;
+}
+
+.feature-card p {
+  color: #4b5563;
+}
+
+footer {
+  background-color: #f9fafb;
+}
+
+@media (max-width: 576px) {
+  .hero h1 {
+    font-size: 2rem;
+  }
+  .hero p {
+    font-size: 1rem;
+  }
+}
+
+/* Auth pages */
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: radial-gradient(circle at top left, #1d2671 0, transparent 50%),
+    radial-gradient(circle at bottom right, #c33764 0, transparent 55%),
+    #020617;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 430px;
+  border-radius: 1rem;
+}
+
+.auth-logo {
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+/* Dashboard */
+.dashboard-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #0f172a 0%, #020617 45%, #f3f4f6 45%);
+  color: #111827;
+}
+
+.dashboard-main {
+  padding: 1.5rem 1rem 2rem;
+}
+
+@media (min-width: 768px) {
+  .dashboard-main {
+    padding: 2rem 2rem 3rem;
+  }
+}
+
+.dashboard-card {
+  border-radius: 0.75rem;
+}
+
+.dashboard-nav {
+  backdrop-filter: blur(10px);
+  background-color: rgba(15, 23, 42, 0.9) !important;
+}
+
+.dashboard-nav-brand {
+  font-weight: 600;
+}
+
+.table-responsive {
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
