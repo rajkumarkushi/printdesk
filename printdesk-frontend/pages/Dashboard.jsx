@@ -8,6 +8,22 @@ function Dashboard() {
   const [profile, setProfile] = useState(null);
   const navigate = useNavigate();
 
+  const markPaid = async (id) => {
+  try {
+    await API.put(`/invoices/${id}/paid`);
+
+    setInvoices(
+      invoices.map((inv) =>
+        inv._id === id
+          ? { ...inv, status: "Paid" }
+          : inv
+      )
+    );
+  } catch (error) {
+    alert("Failed to update status");
+  }
+};
+
   const fetchInvoices = async () => {
     const res = await API.get("/invoices");
     setInvoices(res.data);
@@ -133,198 +149,227 @@ const handleDownload = async (id) => {
       alert(msg);
     }
   };
-  return (
-    <div className="container-fluid">
-      <nav className="navbar navbar-dark bg-dark">
-        <div className="container-fluid px-4 d-flex justify-content-between align-items-center">
-          <div className="d-flex align-items-center gap-2">
-            <div
-              className="rounded-circle bg-light text-dark d-flex align-items-center justify-content-center"
-              style={{ width: 32, height: 32, fontWeight: 700 }}
-            >
-              B
-            </div>
-            <div>
-              <span className="navbar-brand d-block mb-0">Billora</span>
-              <small className="text-light text-opacity-75">
-                Smart Billing for Growing Businesses
-              </small>
-            </div>
-          </div>
-          <div className="d-flex flex-column align-items-end">
-            <span className="text-light fw-semibold">
-              {profile?.businessName}
-            </span>
-            <button
-              className="btn btn-outline-light btn-sm mt-1"
-              onClick={handleLogout}
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </nav>
 
-{usage && (
-  <div className="row mb-4">
-    <div className="col-md-4">
-      <div className="card p-3 shadow">
-        <h6>Current Plan</h6>
-        <h5>{usage.plan.toUpperCase()}</h5>
-      </div>
-    </div>
-
-    <div className="col-md-4">
-      <div className="card p-3 shadow">
-        <h6>Invoices Used</h6>
-        <h5>
-          {usage.plan === "pro"
-            ? usage.used
-            : `${usage.used} / ${usage.limit}`}
-        </h5>
-      </div>
-    </div>
-
-    <div className="col-md-4">
-      <div className="card p-3 shadow">
-        <h6>Remaining</h6>
-        <h5>{usage.plan === "pro" ? "Unlimited" : usage.remaining}</h5>
-      </div>
-    </div>
-  </div>
-
-)}
-      <div className="container-fluid mt-4">
-        <div className="row mb-4">
-          <div className="col-md-6">
-            <div className="card p-3 shadow">
-              <h5>Total Revenue (Last 15 Days)</h5>
-              <h3>₹{totalRevenue}</h3>
-            </div>
-          </div>
-
-          <div className="col-md-6">
-            <div className="card p-3 shadow">
-              <h5>Total Invoices</h5>
-              <h3>{invoices.length}</h3>
-            </div>
-          </div>
-        </div>
-
-        <div className="d-flex flex-wrap justify-content-between mb-3 gap-2">
-          <button
-            className="btn btn-primary mb-2"
-            onClick={() => navigate("/create-invoice")}
+return (
+  <div className="container-fluid p-0">
+    <nav
+      className="navbar navbar-expand-lg shadow-sm"
+      style={{
+        background: "linear-gradient(135deg, #0f172a, #1e293b)",
+        padding: "12px 24px",
+      }}
+    >
+      <div className="container-fluid d-flex justify-content-between align-items-center">
+        <div className="d-flex align-items-center">
+          <div
+            className="d-flex align-items-center justify-content-center me-3"
+            style={{
+              width: "45px",
+              height: "45px",
+              borderRadius: "12px",
+              background: "#3b82f6",
+              color: "white",
+              fontWeight: "700",
+              fontSize: "20px",
+            }}
           >
-            Create Invoice
-          </button>
-          <div className="d-flex flex-wrap gap-2">
-            {usage?.plan === "free" && (
-              <>
-                <button
-                  className="btn btn-outline-warning mb-2"
-                  onClick={handleUpgradeBasic}
-                >
-                  Upgrade to Basic – ₹199/month (200 invoices)
-                </button>
-                <button
-                  className="btn btn-warning mb-2"
-                  onClick={handleUpgradePro}
-                >
-                  Go Pro – ₹399/month (Unlimited)
-                </button>
-              </>
-            )}
-            {usage?.plan === "basic" && (
-              <button
-                className="btn btn-warning mb-2"
-                onClick={handleUpgradePro}
-              >
-                Upgrade to Pro – ₹399/month (Unlimited)
-              </button>
-            )}
+            B
+          </div>
+
+          <div>
+            <h5 className="mb-0 text-white fw-bold">Billora</h5>
+            <small style={{ color: "#cbd5e1", fontSize: "12px" }}>
+              Smart Billing for Growing Businesses
+            </small>
           </div>
         </div>
 
-        <div className="table-responsive">
-          <table className="table table-bordered mb-0">
-            <thead className="table-light">
-              <tr>
-                <th>Invoice No</th>
-                <th>Customer</th>
-                <th>Item</th>
-                <th>Price</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-           <tbody>
-              {invoices.map((inv) => (
-                <tr key={inv._id}>
-                  <td>{inv.invoiceNumber}</td>
-                  <td>{inv.customerName}</td>
-                  <td>
-                    {inv.items.map((item, index) => (
-                      <div key={index}>
-                        {item.itemType} (Qty: {item.quantity})
-                      </div>
-                    ))}
-                  </td>
-                  <td>₹{inv.totalAmount}</td>
-                  <td>
-                    <button
-                      className="btn btn-sm btn-success me-2 mb-1"
-                      onClick={() => handleDownload(inv._id)}
-                    >
-                      Download
-                    </button>
-                    <button
-                      className="btn btn-sm btn-primary me-2 mb-1"
-                      onClick={() => navigate(`/edit-invoice/${inv._id}`)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="btn btn-sm btn-outline-danger mb-1"
-                      onClick={() => handleDelete(inv._id)}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-    </tbody>
-          </table>
+        <div className="d-flex align-items-center gap-3">
+          <div className="text-end">
+            <div className="text-white fw-semibold">
+              {profile?.businessName || "Business"}
+            </div>
+            <small style={{ color: "#94a3b8" }}>Business Account</small>
+          </div>
+
+          <button className="btn btn-light btn-sm px-3" onClick={handleLogout}>
+            Logout
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <div className="container-fluid mt-4 px-4">
+      {usage && (
+        <div className="row mb-4">
+          <div className="col-md-4">
+            <div className="card p-3 shadow">
+              <h6>Current Plan</h6>
+              <h5>{usage.plan.toUpperCase()}</h5>
+            </div>
+          </div>
+
+          <div className="col-md-4">
+            <div className="card p-3 shadow">
+              <h6>Invoices Used</h6>
+              <h5>
+                {usage.plan === "pro"
+                  ? usage.used
+                  : `${usage.used} / ${usage.limit}`}
+              </h5>
+            </div>
+          </div>
+
+          <div className="col-md-4">
+            <div className="card p-3 shadow">
+              <h6>Remaining</h6>
+              <h5>{usage.plan === "pro" ? "Unlimited" : usage.remaining}</h5>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="row mb-4">
+        <div className="col-md-6">
+          <div className="card p-3 shadow">
+            <h5>Total Revenue (Last 15 Days)</h5>
+            <h3>₹{totalRevenue}</h3>
+          </div>
+        </div>
+
+        <div className="col-md-6">
+          <div className="card p-3 shadow">
+            <h5>Total Invoices</h5>
+            <h3>{invoices.length}</h3>
+          </div>
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="bg-dark text-light mt-4 py-3">
-        <div className="container d-flex justify-content-between align-items-center">
-          <span className="text-light text-opacity-75 small">
-            © {new Date().getFullYear()} Billora
-          </span>
-          <div className="d-flex gap-3">
-            <a
-              href="https://instagram.com"
-              target="_blank"
-              rel="noreferrer"
-              className="text-light"
-            >
-              <i className="bi bi-instagram" />
-            </a>
-            <a
-              href="https://wa.me/910000000000"
-              target="_blank"
-              rel="noreferrer"
-              className="text-light"
-            >
-              <i className="bi bi-whatsapp" />
-            </a>
-          </div>
-        </div>
-      </footer>
-    </div>
-  );
-}
+    <div className="d-flex flex-wrap gap-3 mb-4">
+  <button
+    className="btn px-4 py-2"
+    onClick={() => navigate("/create-invoice")}
+    style={{
+      background: "#2563eb",
+      color: "white",
+      borderRadius: "12px",
+      border: "none",
+      fontWeight: "600",
+      boxShadow: "0 4px 12px rgba(37,99,235,0.3)",
+    }}
+  >
+    ➕ Create Invoice
+  </button>
 
+  {usage?.plan === "free" && (
+    <>
+      <button
+        className="btn px-4 py-2"
+        onClick={handleUpgradeBasic}
+        style={{
+          background: "#f59e0b",
+          color: "white",
+          borderRadius: "12px",
+          border: "none",
+          fontWeight: "600",
+        }}
+      >
+        ⭐ Basic ₹199/month
+      </button>
+
+      <button
+        className="btn px-4 py-2"
+        onClick={handleUpgradePro}
+        style={{
+          background: "#7c3aed",
+          color: "white",
+          borderRadius: "12px",
+          border: "none",
+          fontWeight: "600",
+        }}
+      >
+        🚀 Pro ₹399/month
+      </button>
+    </>
+  )}
+
+  {usage?.plan === "basic" && (
+    <button
+      className="btn px-4 py-2"
+      onClick={handleUpgradePro}
+      style={{
+        background: "#7c3aed",
+        color: "white",
+        borderRadius: "12px",
+        border: "none",
+        fontWeight: "600",
+      }}
+    >
+      🚀 Upgrade to Pro ₹399/month
+    </button>
+  )}
+</div>
+
+      <div className="table-responsive">
+        <table className="table table-bordered mb-0">
+          <thead className="table-light">
+            <tr>
+              <th>Invoice No</th>
+              <th>Customer</th>
+              <th>Item</th>
+              <th>Price</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {invoices.map((inv) => (
+              <tr key={inv._id}>
+                <td>{inv.invoiceNumber}</td>
+                <td>{inv.customerName}</td>
+                <td>
+                  {inv.items.map((item, index) => (
+                    <div key={index}>
+                      {item.itemType} (Qty: {item.quantity})
+                    </div>
+                  ))}
+                </td>
+                <td>₹{inv.totalAmount}</td>
+                <td>{inv.status}</td>
+                <td>
+                  <button className="btn btn-sm btn-success me-2 mb-1" onClick={() => handleDownload(inv._id)}>
+                    Download
+                  </button>
+
+                  <button className="btn btn-sm btn-primary me-2 mb-1" onClick={() => navigate(`/edit-invoice/${inv._id}`)}>
+                    Edit
+                  </button>
+
+                  <button className="btn btn-sm btn-warning me-2 mb-1" onClick={() => markPaid(inv._id)}>
+                    Mark Paid
+                  </button>
+
+                  <button className="btn btn-sm btn-outline-danger mb-1" onClick={() => handleDelete(inv._id)}>
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer className="bg-dark text-light mt-4 py-3">
+      <div className="container d-flex justify-content-between align-items-center">
+        <span className="text-light text-opacity-75 small">
+          © {new Date().getFullYear()} Billora
+        </span>
+      </div>
+    </footer>
+  </div>
+);
+
+}
 export default Dashboard;

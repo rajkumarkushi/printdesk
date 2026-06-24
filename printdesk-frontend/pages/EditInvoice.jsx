@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import API from "../services/api";
 import { useNavigate, useParams } from "react-router-dom";
+import invoiceImg from "../src/assets/invoice.png";
 
 function EditInvoice() {
   const { id } = useParams();
@@ -9,8 +10,9 @@ function EditInvoice() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [items, setItems] = useState([]);
+  const [status, setStatus] = useState("Unpaid");
 
-  // Fetch invoice details
+
   useEffect(() => {
     const fetchInvoice = async () => {
       try {
@@ -20,6 +22,7 @@ function EditInvoice() {
         setCustomerName(data.customerName);
         setCustomerPhone(data.customerPhone);
         setItems(data.items);
+        setStatus(data.status || "Unpaid");
       } catch (error) {
         alert("Error loading invoice");
       }
@@ -59,6 +62,7 @@ function EditInvoice() {
         customerName,
         customerPhone,
         items,
+        status,
       });
 
       alert("Invoice Updated Successfully");
@@ -70,9 +74,11 @@ function EditInvoice() {
 
   return (
     <div className="container mt-5">
-      <div className="card p-4 shadow">
+
+      <div className="card p-4 shadow mb-5">
         <div className="d-flex justify-content-between align-items-center mb-3">
           <h3 className="mb-0">Edit Invoice</h3>
+
           <button
             type="button"
             className="btn btn-outline-secondary"
@@ -97,6 +103,16 @@ function EditInvoice() {
             value={customerPhone}
             onChange={(e) => setCustomerPhone(e.target.value)}
           />
+
+          <select
+              className="form-control mb-3"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <option value="Unpaid">Unpaid</option>
+              <option value="Paid">Paid</option>
+        </select>
+
 
           <h5>Items</h5>
 
@@ -173,6 +189,44 @@ function EditInvoice() {
             Update Invoice
           </button>
         </form>
+      </div>
+
+      {/* Invoice Preview Design */}
+      <div className="invoice-preview">
+        <img
+          src={invoiceImg}
+          alt="Invoice Template"
+          className="invoice-template"
+        />
+
+        <h4 className="invoice-title">INVOICE</h4>
+
+        <div className="preview-customer-name">
+          {customerName}
+        </div>
+
+        <div className="preview-customer-phone">
+          {customerPhone}
+        </div>
+
+        <div className="preview-items">
+          {items.map((item, index) => (
+            <div className="preview-row" key={index}>
+              <span>{item.itemType}</span>
+              <span>{item.designName}</span>
+              <span>{item.quantity}</span>
+              <span>₹{item.price}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="preview-total">
+          ₹{totalAmount}
+        </div>
+
+        <div className="preview-status">
+            Status: {status}
+        </div>
       </div>
     </div>
   );
