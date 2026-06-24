@@ -10,6 +10,7 @@ const {
   getUserInvoices,
   downloadUserInvoicePdf,
   downloadUserSummaryPdf,
+  markInvoicePaid,
 } = require("../controllers/adminController");
 
 const router = express.Router();
@@ -19,8 +20,7 @@ router.get("/users", protect, adminOnly, getAllUsers);
 router.put("/users/:id", protect, adminOnly, updateUser);
 router.delete("/users/:id", protect, adminOnly, deleteUser);
 router.get("/users/:id/invoices", protect, adminOnly, getUserInvoices);
-router.get(
-  "/users/:id/invoices/:invoiceId/pdf",
+router.get("/users/:id/invoices/:invoiceId/pdf",
   protect,
   adminOnly,
   downloadUserInvoicePdf
@@ -30,6 +30,12 @@ router.get(
   protect,
   adminOnly,
   downloadUserSummaryPdf
+);
+router.put(
+  "/invoices/:id/paid",
+  protect,
+  adminOnly,
+  markInvoicePaid
 );
 
 module.exports = router;

@@ -33,6 +33,11 @@ const invoiceSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+     status: {
+      type: String,
+      enum: ["Unpaid", "Paid"],
+      default: "Unpaid",
+    },
     // Soft delete flag – when true, invoice is hidden in UI but still counts towards usage
     isDeleted: {
       type: Boolean,
