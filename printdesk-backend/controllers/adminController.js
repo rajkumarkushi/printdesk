@@ -74,10 +74,9 @@ exports.updateUser = async (req, res) => {
     const { businessName, email, plan, invoiceLimit } = req.body;
 
     const user = await Business.findById(id);
-    if (!user || user.role !== "user") {
-      return res.status(404).json({ message: "User not found" });
+    if (!user || (user.role && user.role !== "user")) {
+    return res.status(404).json({ message: "User not found" });
     }
-
     if (businessName !== undefined) user.businessName = businessName;
     if (email !== undefined) user.email = email;
     if (plan !== undefined) user.plan = plan;
@@ -101,10 +100,9 @@ exports.deleteUser = async (req, res) => {
   try {
     const user = await Business.findById(req.params.id);
 
-    if (!user || user.role !== "user") {
-      return res.status(404).json({ message: "User not found" });
+   if (!user || (user.role && user.role !== "user")) {
+     return res.status(404).json({ message: "User not found" });
     }
-
     await Invoice.deleteMany({ businessId: user._id });
     await user.deleteOne();
 
@@ -127,6 +125,29 @@ exports.getUserInvoices = async (req, res) => {
     res.json(invoices);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+// ======================================
+// MARK INVOICE AS PAID
+// Updates invoice payment status from
+// "Unpaid" to "Paid"
+// ======================================
+exports.markInvoicePaid = async (req, res) => {
+  try {
+    const invoice = await Invoice.findByIdAndUpdate(
+      req.params.id,
+      { status: "Paid" },
+      { new: true }
+    );
+
+    if (!invoice) {
+      return res.status(404).json({ message: "Invoice not found" });
+    }
+
+    res.json(invoice);
+  } catch (error) {
+    res.status(500).json({ message: "Error updating status" });
   }
 };
 
@@ -210,6 +231,7 @@ exports.downloadUserInvoicePdf = async (req, res) => {
       .text(`Invoice No: ${invoice.invoiceNumber}`)
       .text(`Customer: ${invoice.customerName}`)
       .text(`Phone: ${invoice.customerPhone || "-"}`)
+      .text(`Status: ${invoice.status || "Unpaid"}`)
       .text(`Date: ${invoice.createdAt.toDateString()}`)
       .moveDown();
 

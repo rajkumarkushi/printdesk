@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const Invoice = require("../models/Invoice");
 const PDFDocument = require("pdfkit");
+const QRCode = require("qrcode");
 
 // ======================================
 // CREATE INVOICE (MULTI-ITEM)
@@ -11,7 +12,6 @@ exports.createInvoice = async (req, res) => {
     const { customerName, customerPhone, items } = req.body;
     const business = req.user;
 
-    // Plan-based monthly limits (admin can override per user via invoiceLimit)
     let limitForCheck;
     const overrideLimit =
       typeof business.invoiceLimit === "number"
@@ -23,7 +23,6 @@ exports.createInvoice = async (req, res) => {
     } else if (business.plan === "basic") {
       limitForCheck = overrideLimit ?? 200;
     } else if (business.plan === "pro") {
-      // If admin sets a custom limit for pro, respect it; otherwise unlimited
       limitForCheck = overrideLimit ?? Number.MAX_SAFE_INTEGER;
     } else {
       limitForCheck = overrideLimit ?? 30;
@@ -71,7 +70,6 @@ exports.createInvoice = async (req, res) => {
     });
 
     res.status(201).json(invoice);
-
   } catch (error) {
     console.log("CREATE INVOICE ERROR:", error);
     res.status(500).json({ error: error.message });
@@ -96,7 +94,7 @@ exports.getInvoices = async (req, res) => {
 };
 
 // ======================================
-// GET MONTHLY USAGE (VERY IMPORTANT)
+// GET MONTHLY USAGE
 // ======================================
 exports.getUsage = async (req, res) => {
   try {
@@ -117,12 +115,12 @@ exports.getUsage = async (req, res) => {
         : null;
 
     let limitForApi;
+
     if (business.plan === "free") {
       limitForApi = overrideLimit ?? 30;
     } else if (business.plan === "basic") {
       limitForApi = overrideLimit ?? 200;
     } else if (business.plan === "pro") {
-      // If admin sets a custom limit, expose it; otherwise unlimited
       limitForApi = overrideLimit ?? null;
     } else {
       limitForApi = overrideLimit ?? 30;
@@ -132,16 +130,13 @@ exports.getUsage = async (req, res) => {
       plan: business.plan,
       used,
       limit: limitForApi,
-      remaining:
-        limitForApi === null ? null : Math.max(limitForApi - used, 0),
+      remaining: limitForApi === null ? null : Math.max(limitForApi - used, 0),
     });
-
   } catch (error) {
     console.log("USAGE ERROR:", error);
     res.status(500).json({ error: error.message });
   }
 };
-
 
 // ======================================
 // GET SINGLE INVOICE
@@ -164,7 +159,6 @@ exports.getInvoiceById = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
-
 
 // ======================================
 // UPDATE INVOICE
@@ -200,12 +194,12 @@ exports.updateInvoice = async (req, res) => {
     await invoice.save();
 
     res.json({ message: "Invoice updated successfully" });
-
   } catch (error) {
     console.log("UPDATE ERROR:", error);
     res.status(500).json({ error: error.message });
   }
 };
+
 // ======================================
 // PROFESSIONAL PDF DOWNLOAD
 // ======================================
@@ -223,107 +217,224 @@ exports.downloadInvoice = async (req, res) => {
 
     const business = req.user;
 
-    // return some metadata as custom headers so frontend can access
     const invoiceCount = await Invoice.countDocuments({
       businessId: business._id,
       isDeleted: false,
     });
 
-    res.setHeader('X-Business-Name', business.businessName || '');
-    res.setHeader('X-Business-Email', business.email || '');
-    res.setHeader('X-Business-Plan', business.plan || '');
-    res.setHeader('X-Total-Invoices', invoiceCount.toString());
+    res.setHeader("X-Business-Name", business.businessName || "");
+    res.setHeader("X-Business-Email", business.email || "");
+    res.setHeader("X-Business-Plan", business.plan || "");
+    res.setHeader("X-Total-Invoices", invoiceCount.toString());
 
-    const doc = new PDFDocument({ margin: 50 });
+    const doc = new PDFDocument({
+      size: "A4",
+      margin: 0,
+    });
 
     res.setHeader(
       "Content-Disposition",
       `attachment; filename=invoice-${invoice.invoiceNumber}.pdf`
     );
+
     res.setHeader("Content-Type", "application/pdf");
 
     doc.pipe(res);
 
-    // Header: Billora brand + business logo + business name
-    let headerY = 50;
+    const templatePath = path.join(
+      __dirname,
+      "../assets/invoice.png"
+    );
+    if (fs.existsSync(templatePath)) {
+      doc.image(templatePath, 0, 0, {
+        width: 595.28,
+        height: 841.89,
+      });
+       // =======================
+  // ADD ALL PDF TEXT HERE
+  // =======================
 
-    if (business.logoUrl) {
-      const logoPath = path.join(__dirname, "..", business.logoUrl);
-      if (fs.existsSync(logoPath)) {
-        try {
-          doc.image(logoPath, 50, headerY, { width: 80 });
-        } catch (e) {
-          // If image fails to load, just skip it
+ doc.fillColor("black");
+doc.fontSize(12);
+
+const labelX = 80;
+const valueX = 220;
+
+// Invoice Date
+doc.font("Helvetica-Bold");
+doc.text("Invoice Date:", labelX, 180);
+
+doc.font("Helvetica");
+doc.text(
+  new Date(invoice.createdAt).toLocaleDateString(),
+  valueX,
+  180
+);
+
+// Invoice Number
+doc.font("Helvetica-Bold");
+doc.text("Invoice Number:", labelX, 210);
+
+doc.font("Helvetica");
+doc.text(invoice.invoiceNumber, valueX, 210);
+
+// Customer Name
+doc.font("Helvetica-Bold");
+doc.text("Customer Name:", labelX, 240);
+
+doc.font("Helvetica");
+doc.text(invoice.customerName, valueX, 240);
+
+// Phone Number
+doc.font("Helvetica-Bold");
+doc.text("Phone Number:", labelX, 270);
+
+doc.font("Helvetica");
+doc.text(invoice.customerPhone || "-", valueX, 270);
+
+  // =======================
+// TABLE: ITEMS + SUBTOTAL
+// =======================
+
+        let tableX = 60;
+        let tableY = 330;
+        let tableWidth = 475;
+
+        let descWidth = 220;
+        let qtyWidth = 70;
+        let priceWidth = 90;
+        let amountWidth = 95;
+
+        let rowHeight = 30;
+
+        // Header row
+        doc.font("Helvetica-Bold");
+        doc.rect(tableX, tableY, tableWidth, rowHeight).stroke();
+
+        doc.text("Items", tableX + 10, tableY + 10);
+        doc.text("Quantity", tableX + descWidth + 10, tableY + 10);
+        doc.text("Price", tableX + descWidth + qtyWidth + 10, tableY + 10);
+        doc.text("Amount", tableX + descWidth + qtyWidth + priceWidth + 10, tableY + 10);
+
+        // Header vertical lines
+        doc.moveTo(tableX + descWidth, tableY).lineTo(tableX + descWidth, tableY + rowHeight).stroke();
+        doc.moveTo(tableX + descWidth + qtyWidth, tableY).lineTo(tableX + descWidth + qtyWidth, tableY + rowHeight).stroke();
+        doc.moveTo(tableX + descWidth + qtyWidth + priceWidth, tableY).lineTo(tableX + descWidth + qtyWidth + priceWidth, tableY + rowHeight).stroke();
+
+        let y = tableY + rowHeight;
+        let subtotal = 0;
+
+        // Item rows
+        invoice.items.forEach((item) => {
+          const itemTotal = Number(item.quantity) * Number(item.price);
+          subtotal += itemTotal;
+
+          doc.font("Helvetica");
+
+          doc.rect(tableX, y, tableWidth, rowHeight).stroke();
+
+          doc.moveTo(tableX + descWidth, y).lineTo(tableX + descWidth, y + rowHeight).stroke();
+          doc.moveTo(tableX + descWidth + qtyWidth, y).lineTo(tableX + descWidth + qtyWidth, y + rowHeight).stroke();
+          doc.moveTo(tableX + descWidth + qtyWidth + priceWidth, y).lineTo(tableX + descWidth + qtyWidth + priceWidth, y + rowHeight).stroke();
+
+          doc.text(item.itemType, tableX + 10, y + 10);
+          doc.text(String(item.quantity), tableX + descWidth + 20, y + 10);
+          doc.text(`Rs. ${item.price}`, tableX + descWidth + qtyWidth + 10, y + 10);
+          doc.text(`Rs. ${itemTotal}`, tableX + descWidth + qtyWidth + priceWidth + 10, y + 10);
+
+          y += rowHeight;
+        });
+
+        // Subtotal row
+        doc.font("Helvetica-Bold");
+
+        doc.rect(tableX, y, tableWidth, rowHeight).stroke();
+
+        doc.moveTo(
+          tableX + descWidth + qtyWidth + priceWidth,
+          y
+        )
+        .lineTo(
+          tableX + descWidth + qtyWidth + priceWidth,
+          y + rowHeight
+        )
+        .stroke();
+
+        doc.text("Subtotal", tableX + 10, y + 10);
+        doc.text(
+          `Rs. ${subtotal}`,
+          tableX + descWidth + qtyWidth + priceWidth + 10,
+          y + 10
+        );
+
+        y += rowHeight;
+
+        // Total row
+        doc.rect(tableX, y, tableWidth, rowHeight).stroke();
+
+        doc.moveTo(
+          tableX + descWidth + qtyWidth + priceWidth,
+          y
+        )
+        .lineTo(
+          tableX + descWidth + qtyWidth + priceWidth,
+          y + rowHeight
+        )
+        .stroke();
+
+        doc.text("Total Amount", tableX + 10, y + 10);
+        doc.text(
+          `Rs. ${subtotal}`,
+          tableX + descWidth + qtyWidth + priceWidth + 10,
+          y + 10
+        );
+        const upiId = "yourupi@oksbi";
+        const payeeName = business.businessName || "PrintDesk";
+        const amount = Number(subtotal).toFixed(2);
+
+        const upiLink = 
+        `upi://pay?pa=${encodeURIComponent(upiId)}` +
+        `&pn=${encodeURIComponent(payeeName)}` +
+        `&am=${amount}` +
+        `&cu=INR`;
+
+        const qrImage = await QRCode.toDataURL(upiLink);
+
+        doc.image(qrImage, 420, 650, {
+          width: 100,
+          height: 100,
+        });
+
+        doc.font("Helvetica-Bold");
+        doc.fontSize(10);
+        doc.text("Scan to Pay", 440, 755);
+        } else {
+          doc.fontSize(18).text("Invoice template image not found", 50, 50);
         }
+
+        doc.end();
+      } catch (error) {
+        console.log("PDF ERROR:", error);
+        res.status(500).json({ error: error.message });
       }
-    }
-
-    // Product branding
-    doc
-      .fontSize(18)
-      .text("Billora", 150, headerY, { continued: false });
-
-    doc
-      .fontSize(10)
-      .fillColor("#555555")
-      .text("Smart Billing for Growing Businesses", 150, headerY + 22);
-
-    // Business name just below branding
-    doc
-      .fontSize(12)
-      .fillColor("#000000")
-      .text(business.businessName || "Your Business", 150, headerY + 40)
-      .moveDown(2);
-
-    doc
-      .fontSize(12)
-      .text(`Invoice No: ${invoice.invoiceNumber}`)
-      .text(`Customer: ${invoice.customerName}`)
-      .text(`Phone: ${invoice.customerPhone || "-"}`)
-      .text(`Date: ${invoice.createdAt.toDateString()}`)
-      .moveDown();
-
-    // Table Header
-    const tableTop = doc.y + 10;
-    const itemX = 50;
-    const qtyX = 250;
-    const priceX = 320;
-    const totalX = 400;
-
-    doc
-      .fontSize(12)
-      .text("Item", itemX, tableTop)
-      .text("Qty", qtyX, tableTop)
-      .text("Price", priceX, tableTop)
-      .text("Total", totalX, tableTop);
-
-    let position = tableTop + 25;
-
-    invoice.items.forEach((item) => {
-      const itemTotal = item.quantity * item.price;
-
-      doc
-        .fontSize(12)
-        .text(item.itemType, itemX, position)
-        .text(item.quantity.toString(), qtyX, position)
-        .text(`₹${item.price}`, priceX, position)
-        .text(`₹${itemTotal}`, totalX, position);
-
-      position += 20;
+};
+exports.markInvoicePaid = async (req, res) => {
+  try {
+    const invoice = await Invoice.findOne({
+      _id: req.params.id,
+      businessId: req.user._id,
+      isDeleted: false,
     });
 
-    doc.moveDown(2);
+    if (!invoice) {
+      return res.status(404).json({ message: "Invoice not found" });
+    }
 
-    doc
-      .fontSize(14)
-      .text(`Grand Total: ₹${invoice.totalAmount}`, {
-        align: "right",
-      });
+    invoice.status = "Paid";
+    await invoice.save();
 
-    doc.end();
-
+    res.json({ message: "Invoice marked as paid" });
   } catch (error) {
-    console.log("PDF ERROR:", error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -346,7 +457,6 @@ exports.deleteInvoice = async (req, res) => {
     invoice.isDeleted = true;
     await invoice.save();
 
-    // Note: we do NOT decrement any usage counters here.
     res.json({ message: "Invoice deleted (soft delete)" });
   } catch (error) {
     console.log("DELETE ERROR:", error);

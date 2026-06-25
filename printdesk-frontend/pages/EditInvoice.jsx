@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import API from "../services/api";
 import { useNavigate, useParams } from "react-router-dom";
+import invoiceImg from "../src/assets/invoice.png";
 
 function EditInvoice() {
   const { id } = useParams();
@@ -8,14 +9,25 @@ function EditInvoice() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [items, setItems] = useState([]);
+  const [status, setStatus] = useState("Unpaid");
+
 
   useEffect(() => {
     const fetchInvoice = async () => {
       try {
         const res = await API.get(`/invoices/${id}`);
+<<<<<<< HEAD
         setCustomerName(res.data.customerName);
         setCustomerPhone(res.data.customerPhone);
         setItems(res.data.items);
+=======
+        const data = res.data;
+
+        setCustomerName(data.customerName);
+        setCustomerPhone(data.customerPhone);
+        setItems(data.items);
+        setStatus(data.status || "Unpaid");
+>>>>>>> e3b63cf940fc2a296506d50c0e7d7ad237004066
       } catch (error) {
         alert("Error loading invoice");
       }
@@ -36,7 +48,17 @@ function EditInvoice() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+<<<<<<< HEAD
       await API.put(`/invoices/${id}`, { customerName, customerPhone, items });
+=======
+      await API.put(`/invoices/${id}`, {
+        customerName,
+        customerPhone,
+        items,
+        status,
+      });
+
+>>>>>>> e3b63cf940fc2a296506d50c0e7d7ad237004066
       alert("Invoice Updated Successfully");
       navigate("/dashboard");
     } catch (error) {
@@ -45,6 +67,7 @@ function EditInvoice() {
   };
 
   return (
+<<<<<<< HEAD
     <div className="invoice-page">
       <div className="invoice-form-card modern-card bg-white p-4 p-md-5">
         <div className="d-flex justify-content-between align-items-center mb-4">
@@ -66,6 +89,50 @@ function EditInvoice() {
               <input className="form-control" placeholder="Customer Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
             </div>
           </div>
+=======
+    <div className="container mt-5">
+
+      <div className="card p-4 shadow mb-5">
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h3 className="mb-0">Edit Invoice</h3>
+
+          <button
+            type="button"
+            className="btn btn-outline-secondary"
+            onClick={() => navigate(-1)}
+          >
+            Close
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <input
+            className="form-control mb-3"
+            placeholder="Customer Name"
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            required
+          />
+
+          <input
+            className="form-control mb-3"
+            placeholder="Customer Phone"
+            value={customerPhone}
+            onChange={(e) => setCustomerPhone(e.target.value)}
+          />
+
+          <select
+              className="form-control mb-3"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <option value="Unpaid">Unpaid</option>
+              <option value="Paid">Paid</option>
+        </select>
+
+
+          <h5>Items</h5>
+>>>>>>> e3b63cf940fc2a296506d50c0e7d7ad237004066
 
           <h5 className="fw-bold">Items</h5>
           {items.map((item, index) => (
@@ -99,6 +166,44 @@ function EditInvoice() {
           </div>
           <button className="btn btn-primary mt-3 px-4">Update Invoice</button>
         </form>
+      </div>
+
+      {/* Invoice Preview Design */}
+      <div className="invoice-preview">
+        <img
+          src={invoiceImg}
+          alt="Invoice Template"
+          className="invoice-template"
+        />
+
+        <h4 className="invoice-title">INVOICE</h4>
+
+        <div className="preview-customer-name">
+          {customerName}
+        </div>
+
+        <div className="preview-customer-phone">
+          {customerPhone}
+        </div>
+
+        <div className="preview-items">
+          {items.map((item, index) => (
+            <div className="preview-row" key={index}>
+              <span>{item.itemType}</span>
+              <span>{item.designName}</span>
+              <span>{item.quantity}</span>
+              <span>₹{item.price}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="preview-total">
+          ₹{totalAmount}
+        </div>
+
+        <div className="preview-status">
+            Status: {status}
+        </div>
       </div>
     </div>
   );
