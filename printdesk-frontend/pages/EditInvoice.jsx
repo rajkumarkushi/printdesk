@@ -16,18 +16,12 @@ function EditInvoice() {
     const fetchInvoice = async () => {
       try {
         const res = await API.get(`/invoices/${id}`);
-<<<<<<< HEAD
-        setCustomerName(res.data.customerName);
-        setCustomerPhone(res.data.customerPhone);
-        setItems(res.data.items);
-=======
         const data = res.data;
 
         setCustomerName(data.customerName);
         setCustomerPhone(data.customerPhone);
         setItems(data.items);
         setStatus(data.status || "Unpaid");
->>>>>>> e3b63cf940fc2a296506d50c0e7d7ad237004066
       } catch (error) {
         alert("Error loading invoice");
       }
@@ -48,9 +42,6 @@ function EditInvoice() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-<<<<<<< HEAD
-      await API.put(`/invoices/${id}`, { customerName, customerPhone, items });
-=======
       await API.put(`/invoices/${id}`, {
         customerName,
         customerPhone,
@@ -58,7 +49,6 @@ function EditInvoice() {
         status,
       });
 
->>>>>>> e3b63cf940fc2a296506d50c0e7d7ad237004066
       alert("Invoice Updated Successfully");
       navigate("/dashboard");
     } catch (error) {
@@ -67,29 +57,6 @@ function EditInvoice() {
   };
 
   return (
-<<<<<<< HEAD
-    <div className="invoice-page">
-      <div className="invoice-form-card modern-card bg-white p-4 p-md-5">
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <div>
-            <p className="metric-label mb-1">Invoice editor</p>
-            <h3 className="fw-bold mb-0">Edit Invoice</h3>
-          </div>
-          <button type="button" className="btn btn-outline-secondary" onClick={() => navigate(-1)}>Close</button>
-        </div>
-
-        <form onSubmit={handleSubmit}>
-          <div className="row g-3 mb-4">
-            <div className="col-md-6">
-              <label className="form-label">Customer Name</label>
-              <input className="form-control" placeholder="Customer Name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
-            </div>
-            <div className="col-md-6">
-              <label className="form-label">Customer Phone</label>
-              <input className="form-control" placeholder="Customer Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
-            </div>
-          </div>
-=======
     <div className="container mt-5">
 
       <div className="card p-4 shadow mb-5">
@@ -132,7 +99,6 @@ function EditInvoice() {
 
 
           <h5>Items</h5>
->>>>>>> e3b63cf940fc2a296506d50c0e7d7ad237004066
 
           <h5 className="fw-bold">Items</h5>
           {items.map((item, index) => (
