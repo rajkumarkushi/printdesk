@@ -241,183 +241,217 @@ exports.downloadInvoice = async (req, res) => {
 
     doc.pipe(res);
 
-    const templatePath = path.join(
-      __dirname,
-      "../assets/invoice.png"
-    );
+    const templatePath = path.join(__dirname, "../assets/invoice.png");
+
     if (fs.existsSync(templatePath)) {
+      // 1. Add invoice template first
       doc.image(templatePath, 0, 0, {
         width: 595.28,
         height: 841.89,
       });
-       // =======================
-  // ADD ALL PDF TEXT HERE
-  // =======================
 
- doc.fillColor("black");
-doc.fontSize(12);
+      // 2. Add watermark after template
+      const logoPath = path.join(__dirname, "../assets/billora.png");
 
-const labelX = 80;
-const valueX = 220;
+      console.log("Watermark path:", logoPath);
+      console.log("Watermark exists:", fs.existsSync(logoPath));
 
-// Invoice Date
-doc.font("Helvetica-Bold");
-doc.text("Invoice Date:", labelX, 180);
+      if (fs.existsSync(logoPath)) {
+        const pageWidth = doc.page.width;
+        const watermarkWidth = 450;
+        doc.opacity(0.1); // increase/decrease later
+        doc.image(
+          logoPath,
+          (pageWidth - watermarkWidth) / 2,
+          150,
+          {
+            width : watermarkWidth,
+          }
+        );
+        doc.opacity(1);
+      }
 
-doc.font("Helvetica");
-doc.text(
-  new Date(invoice.createdAt).toLocaleDateString(),
-  valueX,
-  180
-);
+      // 3. Add invoice text after watermark
+      doc.fillColor("black");
+      doc.fontSize(12);
 
-// Invoice Number
-doc.font("Helvetica-Bold");
-doc.text("Invoice Number:", labelX, 210);
+      const labelX = 80;
+      const valueX = 220;
 
-doc.font("Helvetica");
-doc.text(invoice.invoiceNumber, valueX, 210);
+      doc.font("Helvetica-Bold");
+      doc.text("Invoice Date:", labelX, 180);
 
-// Customer Name
-doc.font("Helvetica-Bold");
-doc.text("Customer Name:", labelX, 240);
+      doc.font("Helvetica");
+      doc.text(new Date(invoice.createdAt).toLocaleDateString(), valueX, 180);
 
-doc.font("Helvetica");
-doc.text(invoice.customerName, valueX, 240);
+      doc.font("Helvetica-Bold");
+      doc.text("Invoice Number:", labelX, 210);
 
-// Phone Number
-doc.font("Helvetica-Bold");
-doc.text("Phone Number:", labelX, 270);
+      doc.font("Helvetica");
+      doc.text(invoice.invoiceNumber, valueX, 210);
 
-doc.font("Helvetica");
-doc.text(invoice.customerPhone || "-", valueX, 270);
+      doc.font("Helvetica-Bold");
+      doc.text("Customer Name:", labelX, 240);
 
-  // =======================
-// TABLE: ITEMS + SUBTOTAL
-// =======================
+      doc.font("Helvetica");
+      doc.text(invoice.customerName, valueX, 240);
 
-        let tableX = 60;
-        let tableY = 330;
-        let tableWidth = 475;
+      doc.font("Helvetica-Bold");
+      doc.text("Phone Number:", labelX, 270);
 
-        let descWidth = 220;
-        let qtyWidth = 70;
-        let priceWidth = 90;
-        let amountWidth = 95;
+      doc.font("Helvetica");
+      doc.text(invoice.customerPhone || "-", valueX, 270);
 
-        let rowHeight = 30;
+      // =======================
+      // TABLE
+      // =======================
 
-        // Header row
-        doc.font("Helvetica-Bold");
-        doc.rect(tableX, tableY, tableWidth, rowHeight).stroke();
+      let tableX = 60;
+      let tableY = 330;
+      let tableWidth = 475;
 
-        doc.text("Items", tableX + 10, tableY + 10);
-        doc.text("Quantity", tableX + descWidth + 10, tableY + 10);
-        doc.text("Price", tableX + descWidth + qtyWidth + 10, tableY + 10);
-        doc.text("Amount", tableX + descWidth + qtyWidth + priceWidth + 10, tableY + 10);
+      let descWidth = 220;
+      let qtyWidth = 70;
+      let priceWidth = 90;
+      let amountWidth = 95;
 
-        // Header vertical lines
-        doc.moveTo(tableX + descWidth, tableY).lineTo(tableX + descWidth, tableY + rowHeight).stroke();
-        doc.moveTo(tableX + descWidth + qtyWidth, tableY).lineTo(tableX + descWidth + qtyWidth, tableY + rowHeight).stroke();
-        doc.moveTo(tableX + descWidth + qtyWidth + priceWidth, tableY).lineTo(tableX + descWidth + qtyWidth + priceWidth, tableY + rowHeight).stroke();
+      let rowHeight = 30;
 
-        let y = tableY + rowHeight;
-        let subtotal = 0;
+      doc.font("Helvetica-Bold");
+      doc.rect(tableX, tableY, tableWidth, rowHeight).stroke();
 
-        // Item rows
-        invoice.items.forEach((item) => {
-          const itemTotal = Number(item.quantity) * Number(item.price);
-          subtotal += itemTotal;
+      doc.text("Items", tableX + 10, tableY + 10);
+      doc.text("Quantity", tableX + descWidth + 10, tableY + 10);
+      doc.text("Price", tableX + descWidth + qtyWidth + 10, tableY + 10);
+      doc.text(
+        "Amount",
+        tableX + descWidth + qtyWidth + priceWidth + 10,
+        tableY + 10
+      );
 
-          doc.font("Helvetica");
+      doc
+        .moveTo(tableX + descWidth, tableY)
+        .lineTo(tableX + descWidth, tableY + rowHeight)
+        .stroke();
 
-          doc.rect(tableX, y, tableWidth, rowHeight).stroke();
+      doc
+        .moveTo(tableX + descWidth + qtyWidth, tableY)
+        .lineTo(tableX + descWidth + qtyWidth, tableY + rowHeight)
+        .stroke();
 
-          doc.moveTo(tableX + descWidth, y).lineTo(tableX + descWidth, y + rowHeight).stroke();
-          doc.moveTo(tableX + descWidth + qtyWidth, y).lineTo(tableX + descWidth + qtyWidth, y + rowHeight).stroke();
-          doc.moveTo(tableX + descWidth + qtyWidth + priceWidth, y).lineTo(tableX + descWidth + qtyWidth + priceWidth, y + rowHeight).stroke();
-
-          doc.text(item.itemType, tableX + 10, y + 10);
-          doc.text(String(item.quantity), tableX + descWidth + 20, y + 10);
-          doc.text(`Rs. ${item.price}`, tableX + descWidth + qtyWidth + 10, y + 10);
-          doc.text(`Rs. ${itemTotal}`, tableX + descWidth + qtyWidth + priceWidth + 10, y + 10);
-
-          y += rowHeight;
-        });
-
-        // Subtotal row
-        doc.font("Helvetica-Bold");
-
-        doc.rect(tableX, y, tableWidth, rowHeight).stroke();
-
-        doc.moveTo(
-          tableX + descWidth + qtyWidth + priceWidth,
-          y
-        )
+      doc
+        .moveTo(tableX + descWidth + qtyWidth + priceWidth, tableY)
         .lineTo(
           tableX + descWidth + qtyWidth + priceWidth,
-          y + rowHeight
+          tableY + rowHeight
         )
         .stroke();
 
-        doc.text("Subtotal", tableX + 10, y + 10);
+      let y = tableY + rowHeight;
+      let subtotal = 0;
+
+      invoice.items.forEach((item) => {
+        const itemTotal = Number(item.quantity) * Number(item.price);
+        subtotal += itemTotal;
+
+        doc.font("Helvetica");
+
+        doc.rect(tableX, y, tableWidth, rowHeight).stroke();
+
+        doc
+          .moveTo(tableX + descWidth, y)
+          .lineTo(tableX + descWidth, y + rowHeight)
+          .stroke();
+
+        doc
+          .moveTo(tableX + descWidth + qtyWidth, y)
+          .lineTo(tableX + descWidth + qtyWidth, y + rowHeight)
+          .stroke();
+
+        doc
+          .moveTo(tableX + descWidth + qtyWidth + priceWidth, y)
+          .lineTo(tableX + descWidth + qtyWidth + priceWidth, y + rowHeight)
+          .stroke();
+
+        doc.text(item.itemType, tableX + 10, y + 10);
+        doc.text(String(item.quantity), tableX + descWidth + 20, y + 10);
+        doc.text(`Rs. ${item.price}`, tableX + descWidth + qtyWidth + 10, y + 10);
         doc.text(
-          `Rs. ${subtotal}`,
+          `Rs. ${itemTotal}`,
           tableX + descWidth + qtyWidth + priceWidth + 10,
           y + 10
         );
 
         y += rowHeight;
+      });
 
-        // Total row
-        doc.rect(tableX, y, tableWidth, rowHeight).stroke();
+      // Subtotal row
+      doc.font("Helvetica-Bold");
+      doc.rect(tableX, y, tableWidth, rowHeight).stroke();
 
-        doc.moveTo(
-          tableX + descWidth + qtyWidth + priceWidth,
-          y
-        )
-        .lineTo(
-          tableX + descWidth + qtyWidth + priceWidth,
-          y + rowHeight
-        )
+      doc
+        .moveTo(tableX + descWidth + qtyWidth + priceWidth, y)
+        .lineTo(tableX + descWidth + qtyWidth + priceWidth, y + rowHeight)
         .stroke();
 
-        doc.text("Total Amount", tableX + 10, y + 10);
-        doc.text(
-          `Rs. ${subtotal}`,
-          tableX + descWidth + qtyWidth + priceWidth + 10,
-          y + 10
-        );
-        const upiId = "yourupi@oksbi";
-        const payeeName = business.businessName || "PrintDesk";
-        const amount = Number(subtotal).toFixed(2);
+      doc.text("Subtotal", tableX + 10, y + 10);
+      doc.text(
+        `Rs. ${subtotal}`,
+        tableX + descWidth + qtyWidth + priceWidth + 10,
+        y + 10
+      );
 
-        const upiLink = 
+      y += rowHeight;
+
+      // Total row
+      doc.rect(tableX, y, tableWidth, rowHeight).stroke();
+
+      doc
+        .moveTo(tableX + descWidth + qtyWidth + priceWidth, y)
+        .lineTo(tableX + descWidth + qtyWidth + priceWidth, y + rowHeight)
+        .stroke();
+
+      doc.text("Total Amount", tableX + 10, y + 10);
+      doc.text(
+        `Rs. ${subtotal}`,
+        tableX + descWidth + qtyWidth + priceWidth + 10,
+        y + 10
+      );
+
+      // QR Code
+      const upiId = "yourupi@oksbi";
+      const payeeName = business.businessName || "Billora";
+      const amount = Number(subtotal).toFixed(2);
+
+      const upiLink =
         `upi://pay?pa=${encodeURIComponent(upiId)}` +
         `&pn=${encodeURIComponent(payeeName)}` +
         `&am=${amount}` +
         `&cu=INR`;
 
-        const qrImage = await QRCode.toDataURL(upiLink);
+      const qrImage = await QRCode.toDataURL(upiLink);
 
-        doc.image(qrImage, 420, 650, {
-          width: 100,
-          height: 100,
-        });
+      doc.image(qrImage, 420, 650, {
+        width: 100,
+        height: 100,
+      });
 
-        doc.font("Helvetica-Bold");
-        doc.fontSize(10);
-        doc.text("Scan to Pay", 440, 755);
-        } else {
-          doc.fontSize(18).text("Invoice template image not found", 50, 50);
-        }
+      doc.font("Helvetica-Bold");
+      doc.fontSize(10);
+      doc.text("Scan to Pay", 440, 755);
+    } else {
+      doc.fontSize(18).text("Invoice template image not found", 50, 50);
+    }
 
-        doc.end();
-      } catch (error) {
-        console.log("PDF ERROR:", error);
-        res.status(500).json({ error: error.message });
-      }
+    doc.end();
+  } catch (error) {
+    console.log("PDF ERROR:", error);
+    res.status(500).json({ error: error.message });
+  }
 };
+// ======================================
+// MARK INVOICE AS PAID
+// ======================================
 exports.markInvoicePaid = async (req, res) => {
   try {
     const invoice = await Invoice.findOne({
@@ -430,17 +464,18 @@ exports.markInvoicePaid = async (req, res) => {
       return res.status(404).json({ message: "Invoice not found" });
     }
 
-    invoice.status = "Paid";
+    invoice.status = "paid";
     await invoice.save();
 
-    res.json({ message: "Invoice marked as paid" });
+    res.json({ message: "Invoice marked as paid", invoice });
   } catch (error) {
+    console.log("MARK PAID ERROR:", error);
     res.status(500).json({ error: error.message });
   }
 };
 
 // ======================================
-// SOFT DELETE INVOICE
+// DELETE INVOICE SOFT DELETE
 // ======================================
 exports.deleteInvoice = async (req, res) => {
   try {
@@ -457,9 +492,9 @@ exports.deleteInvoice = async (req, res) => {
     invoice.isDeleted = true;
     await invoice.save();
 
-    res.json({ message: "Invoice deleted (soft delete)" });
+    res.json({ message: "Invoice deleted successfully" });
   } catch (error) {
-    console.log("DELETE ERROR:", error);
+    console.log("DELETE INVOICE ERROR:", error);
     res.status(500).json({ error: error.message });
   }
 };
