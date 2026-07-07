@@ -4,19 +4,53 @@ const Invoice = require("../models/Invoice");
 const PDFDocument = require("pdfkit");
 const QRCode = require("qrcode");
 
+// ===============================
+// COMMON CALCULATION FUNCTION
+// ===============================
+const calculateInvoiceTotals = (items, gstPercentInput, discountInput) => {
+  const subtotal = items.reduce((acc, item) => {
+    const qty = Number(item.quantity) || 0;
+    const price = Number(item.price) || 0;
+    return acc + qty * price;
+  }, 0);
+
+  const allowedGstRates = [0, 5, 12, 18, 28];
+
+  const requestedGst = Number(gstPercentInput);
+  const gstPercent = allowedGstRates.includes(requestedGst)
+    ? requestedGst
+    : 18;
+
+  const gstAmount = Math.round((subtotal * gstPercent) / 100);
+
+  const requestedDiscount = Number(discountInput);
+  const discount =
+    Number.isFinite(requestedDiscount) && requestedDiscount > 0
+      ? Math.min(requestedDiscount, subtotal + gstAmount)
+      : 0;
+
+  const totalAmount = Math.max(0, subtotal - gstAmount - discount);
+
+  return {
+    subtotal,
+    gstPercent,
+    gstAmount,
+    discount,
+    totalAmount,
+  };
+};
+
 // ======================================
-// CREATE INVOICE (MULTI-ITEM)
+// CREATE INVOICE
 // ======================================
 exports.createInvoice = async (req, res) => {
   try {
-    const { customerName, customerPhone, items } = req.body;
+    const { customerName, customerPhone, items, gstPercent, discount } = req.body;
     const business = req.user;
 
     let limitForCheck;
     const overrideLimit =
-      typeof business.invoiceLimit === "number"
-        ? business.invoiceLimit
-        : null;
+      typeof business.invoiceLimit === "number" ? business.invoiceLimit : null;
 
     if (business.plan === "free") {
       limitForCheck = overrideLimit ?? 30;
@@ -49,11 +83,7 @@ exports.createInvoice = async (req, res) => {
       });
     }
 
-    const totalAmount = items.reduce((acc, item) => {
-      const qty = Number(item.quantity);
-      const price = Number(item.price);
-      return acc + qty * price;
-    }, 0);
+    const totals = calculateInvoiceTotals(items, gstPercent, discount);
 
     const invoice = await Invoice.create({
       businessId: business._id,
@@ -66,7 +96,10 @@ exports.createInvoice = async (req, res) => {
         quantity: Number(item.quantity),
         price: Number(item.price),
       })),
-      totalAmount,
+      gstPercent: totals.gstPercent,
+      gstAmount: totals.gstAmount,
+      discount: totals.discount,
+      totalAmount: totals.totalAmount,
     });
 
     res.status(201).json(invoice);
@@ -110,9 +143,7 @@ exports.getUsage = async (req, res) => {
     });
 
     const overrideLimit =
-      typeof business.invoiceLimit === "number"
-        ? business.invoiceLimit
-        : null;
+      typeof business.invoiceLimit === "number" ? business.invoiceLimit : null;
 
     let limitForApi;
 
@@ -165,7 +196,7 @@ exports.getInvoiceById = async (req, res) => {
 // ======================================
 exports.updateInvoice = async (req, res) => {
   try {
-    const { customerName, customerPhone, items } = req.body;
+    const { customerName, customerPhone, items, gstPercent, discount } = req.body;
 
     const invoice = await Invoice.findOne({
       _id: req.params.id,
@@ -177,23 +208,32 @@ exports.updateInvoice = async (req, res) => {
       return res.status(404).json({ message: "Invoice not found" });
     }
 
-    const totalAmount = items.reduce((acc, item) => {
-      return acc + Number(item.quantity) * Number(item.price);
-    }, 0);
+    if (!items || items.length === 0) {
+      return res.status(400).json({
+        message: "At least one item is required",
+      });
+    }
+
+    const totals = calculateInvoiceTotals(items, gstPercent, discount);
 
     invoice.customerName = customerName;
     invoice.customerPhone = customerPhone;
+
     invoice.items = items.map((item) => ({
       itemType: item.itemType,
       designName: item.designName,
       quantity: Number(item.quantity),
       price: Number(item.price),
     }));
-    invoice.totalAmount = totalAmount;
+
+    invoice.gstPercent = totals.gstPercent;
+    invoice.gstAmount = totals.gstAmount;
+    invoice.discount = totals.discount;
+    invoice.totalAmount = totals.totalAmount;
 
     await invoice.save();
 
-    res.json({ message: "Invoice updated successfully" });
+    res.json({ message: "Invoice updated successfully", invoice });
   } catch (error) {
     console.log("UPDATE ERROR:", error);
     res.status(500).json({ error: error.message });
@@ -201,7 +241,7 @@ exports.updateInvoice = async (req, res) => {
 };
 
 // ======================================
-// PROFESSIONAL PDF DOWNLOAD
+// DOWNLOAD INVOICE PDF
 // ======================================
 exports.downloadInvoice = async (req, res) => {
   try {
@@ -217,231 +257,137 @@ exports.downloadInvoice = async (req, res) => {
 
     const business = req.user;
 
-    const invoiceCount = await Invoice.countDocuments({
-      businessId: business._id,
-      isDeleted: false,
-    });
-
-    res.setHeader("X-Business-Name", business.businessName || "");
-    res.setHeader("X-Business-Email", business.email || "");
-    res.setHeader("X-Business-Plan", business.plan || "");
-    res.setHeader("X-Total-Invoices", invoiceCount.toString());
-
     const doc = new PDFDocument({
-      size: "A4",
-      margin: 0,
+      size: [226, 700],
+      margin: 15,
     });
 
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=invoice-${invoice.invoiceNumber}.pdf`
+      `attachment; filename=receipt-${invoice.invoiceNumber}.pdf`
     );
-
     res.setHeader("Content-Type", "application/pdf");
 
     doc.pipe(res);
 
-    const templatePath = path.join(__dirname, "../assets/invoice.png");
+    const logoPath = path.join(__dirname, "../assets/billora.png");
 
-    if (fs.existsSync(templatePath)) {
-      // 1. Add invoice template first
-      doc.image(templatePath, 0, 0, {
-        width: 595.28,
-        height: 841.89,
+    if (fs.existsSync(logoPath)) {
+      doc.opacity(0.2);
+      doc.image(logoPath, 38, 180, {
+        width: 150,
       });
-
-      // 2. Add watermark after template
-      const logoPath = path.join(__dirname, "../assets/billora.png");
-
-      console.log("Watermark path:", logoPath);
-      console.log("Watermark exists:", fs.existsSync(logoPath));
-
-      if (fs.existsSync(logoPath)) {
-        const pageWidth = doc.page.width;
-        const watermarkWidth = 450;
-        doc.opacity(0.1); // increase/decrease later
-        doc.image(
-          logoPath,
-          (pageWidth - watermarkWidth) / 2,
-          150,
-          {
-            width : watermarkWidth,
-          }
-        );
-        doc.opacity(1);
-      }
-
-      // 3. Add invoice text after watermark
-      doc.fillColor("black");
-      doc.fontSize(12);
-
-      const labelX = 80;
-      const valueX = 220;
-
-      doc.font("Helvetica-Bold");
-      doc.text("Invoice Date:", labelX, 180);
-
-      doc.font("Helvetica");
-      doc.text(new Date(invoice.createdAt).toLocaleDateString(), valueX, 180);
-
-      doc.font("Helvetica-Bold");
-      doc.text("Invoice Number:", labelX, 210);
-
-      doc.font("Helvetica");
-      doc.text(invoice.invoiceNumber, valueX, 210);
-
-      doc.font("Helvetica-Bold");
-      doc.text("Customer Name:", labelX, 240);
-
-      doc.font("Helvetica");
-      doc.text(invoice.customerName, valueX, 240);
-
-      doc.font("Helvetica-Bold");
-      doc.text("Phone Number:", labelX, 270);
-
-      doc.font("Helvetica");
-      doc.text(invoice.customerPhone || "-", valueX, 270);
-
-      // =======================
-      // TABLE
-      // =======================
-
-      let tableX = 60;
-      let tableY = 330;
-      let tableWidth = 475;
-
-      let descWidth = 220;
-      let qtyWidth = 70;
-      let priceWidth = 90;
-      let amountWidth = 95;
-
-      let rowHeight = 30;
-
-      doc.font("Helvetica-Bold");
-      doc.rect(tableX, tableY, tableWidth, rowHeight).stroke();
-
-      doc.text("Items", tableX + 10, tableY + 10);
-      doc.text("Quantity", tableX + descWidth + 10, tableY + 10);
-      doc.text("Price", tableX + descWidth + qtyWidth + 10, tableY + 10);
-      doc.text(
-        "Amount",
-        tableX + descWidth + qtyWidth + priceWidth + 10,
-        tableY + 10
-      );
-
-      doc
-        .moveTo(tableX + descWidth, tableY)
-        .lineTo(tableX + descWidth, tableY + rowHeight)
-        .stroke();
-
-      doc
-        .moveTo(tableX + descWidth + qtyWidth, tableY)
-        .lineTo(tableX + descWidth + qtyWidth, tableY + rowHeight)
-        .stroke();
-
-      doc
-        .moveTo(tableX + descWidth + qtyWidth + priceWidth, tableY)
-        .lineTo(
-          tableX + descWidth + qtyWidth + priceWidth,
-          tableY + rowHeight
-        )
-        .stroke();
-
-      let y = tableY + rowHeight;
-      let subtotal = 0;
-
-      invoice.items.forEach((item) => {
-        const itemTotal = Number(item.quantity) * Number(item.price);
-        subtotal += itemTotal;
-
-        doc.font("Helvetica");
-
-        doc.rect(tableX, y, tableWidth, rowHeight).stroke();
-
-        doc
-          .moveTo(tableX + descWidth, y)
-          .lineTo(tableX + descWidth, y + rowHeight)
-          .stroke();
-
-        doc
-          .moveTo(tableX + descWidth + qtyWidth, y)
-          .lineTo(tableX + descWidth + qtyWidth, y + rowHeight)
-          .stroke();
-
-        doc
-          .moveTo(tableX + descWidth + qtyWidth + priceWidth, y)
-          .lineTo(tableX + descWidth + qtyWidth + priceWidth, y + rowHeight)
-          .stroke();
-
-        doc.text(item.itemType, tableX + 10, y + 10);
-        doc.text(String(item.quantity), tableX + descWidth + 20, y + 10);
-        doc.text(`Rs. ${item.price}`, tableX + descWidth + qtyWidth + 10, y + 10);
-        doc.text(
-          `Rs. ${itemTotal}`,
-          tableX + descWidth + qtyWidth + priceWidth + 10,
-          y + 10
-        );
-
-        y += rowHeight;
-      });
-
-      // Subtotal row
-      doc.font("Helvetica-Bold");
-      doc.rect(tableX, y, tableWidth, rowHeight).stroke();
-
-      doc
-        .moveTo(tableX + descWidth + qtyWidth + priceWidth, y)
-        .lineTo(tableX + descWidth + qtyWidth + priceWidth, y + rowHeight)
-        .stroke();
-
-      doc.text("Subtotal", tableX + 10, y + 10);
-      doc.text(
-        `Rs. ${subtotal}`,
-        tableX + descWidth + qtyWidth + priceWidth + 10,
-        y + 10
-      );
-
-      y += rowHeight;
-
-      // Total row
-      doc.rect(tableX, y, tableWidth, rowHeight).stroke();
-
-      doc
-        .moveTo(tableX + descWidth + qtyWidth + priceWidth, y)
-        .lineTo(tableX + descWidth + qtyWidth + priceWidth, y + rowHeight)
-        .stroke();
-
-      doc.text("Total Amount", tableX + 10, y + 10);
-      doc.text(
-        `Rs. ${subtotal}`,
-        tableX + descWidth + qtyWidth + priceWidth + 10,
-        y + 10
-      );
-
-      // QR Code
-      const upiId = "yourupi@oksbi";
-      const payeeName = business.businessName || "Billora";
-      const amount = Number(subtotal).toFixed(2);
-
-      const upiLink =
-        `upi://pay?pa=${encodeURIComponent(upiId)}` +
-        `&pn=${encodeURIComponent(payeeName)}` +
-        `&am=${amount}` +
-        `&cu=INR`;
-
-      const qrImage = await QRCode.toDataURL(upiLink);
-
-      doc.image(qrImage, 420, 650, {
-        width: 100,
-        height: 100,
-      });
-
-      doc.font("Helvetica-Bold");
-      doc.fontSize(10);
-      doc.text("Scan to Pay", 440, 755);
-    } else {
-      doc.fontSize(18).text("Invoice template image not found", 50, 50);
+      doc.opacity(1);
     }
+
+    let y = 20;
+
+    const line = () => {
+      doc.moveTo(15, y).lineTo(211, y).stroke();
+      y += 12;
+    };
+
+    doc.font("Helvetica-Bold").fontSize(18).text("BILLORA", {
+      align: "center",
+    });
+
+    y += 30;
+
+    doc.font("Helvetica").fontSize(10);
+    doc.text(`Invoice #${invoice.invoiceNumber}`, 15, y);
+    y += 14;
+    doc.text(new Date(invoice.createdAt).toLocaleDateString(), 15, y);
+
+    y += 20;
+    doc.text(invoice.customerName || "-", 15, y);
+    y += 14;
+    doc.text(invoice.customerPhone || "-", 15, y);
+
+    y += 20;
+    line();
+
+    doc.font("Helvetica-Bold");
+    doc.text("Item", 15, y);
+    doc.text("Qty", 120, y);
+    doc.text("Amount", 160, y);
+
+    y += 15;
+    line();
+
+    let subtotal = 0;
+
+    invoice.items.forEach((item) => {
+      const itemTotal = Number(item.quantity) * Number(item.price);
+      subtotal += itemTotal;
+
+      doc.font("Helvetica").fontSize(10);
+      doc.text(item.itemType || "-", 15, y, { width: 90 });
+      doc.text(String(item.quantity), 125, y);
+      doc.text(`Rs. ${itemTotal}`, 160, y);
+
+      y += 18;
+    });
+
+    y += 5;
+    line();
+
+    const gstPercent = Number(invoice.gstPercent) || 0;
+    const gstAmount = Number(invoice.gstAmount) || 0;
+    const discount = Number(invoice.discount) || 0;
+    const totalAmount = Number(invoice.totalAmount) || 0;
+
+    doc.font("Helvetica").fontSize(10);
+
+    doc.text("Subtotal", 15, y);
+    doc.text(`Rs. ${subtotal}`, 155, y);
+
+    y += 15;
+
+    doc.text(`GST (${gstPercent}%)`, 15, y);
+    doc.text(`Rs. ${gstAmount}`, 155, y);
+
+    y += 15;
+
+    doc.text("Discount", 15, y);
+    doc.text(`Rs. ${discount}`, 155, y);
+
+    y += 18;
+    line();
+
+    doc.font("Helvetica-Bold").fontSize(14);
+    doc.text("TOTAL", 15, y);
+    doc.text(`Rs. ${totalAmount}`, 145, y);
+
+    y += 30;
+
+    const upiId = "yourupi@oksbi";
+    const payeeName = business.businessName || "Billora";
+    const amount = totalAmount.toFixed(2);
+
+    const upiLink =
+      `upi://pay?pa=${encodeURIComponent(upiId)}` +
+      `&pn=${encodeURIComponent(payeeName)}` +
+      `&am=${amount}` +
+      `&cu=INR`;
+
+    const qrImage = await QRCode.toDataURL(upiLink);
+
+    const qrSize = 90;
+    const qrX = doc.page.width - qrSize - 15;
+
+    doc.image(qrImage, qrX, y + 30, {
+      width: qrSize,
+      height: qrSize,
+    });
+
+    y += 140;
+    line();
+
+    doc.font("Helvetica-Bold").fontSize(12);
+    doc.text("Thank you!", 0, y, {
+      align: "center",
+      width: doc.page.width,
+    });
 
     doc.end();
   } catch (error) {
@@ -449,6 +395,7 @@ exports.downloadInvoice = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
 // ======================================
 // MARK INVOICE AS PAID
 // ======================================

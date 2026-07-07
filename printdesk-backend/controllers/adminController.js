@@ -235,12 +235,12 @@ exports.downloadUserInvoicePdf = async (req, res) => {
       .text(`Date: ${invoice.createdAt.toDateString()}`)
       .moveDown();
 
-    // Items table
-    const tableTop = doc.y + 10;
-    const itemX = 50;
-    const qtyX = 250;
-    const priceX = 320;
-    const totalX = 400;
+      // Items table 
+      const tableTop = doc.y + 10;
+      const itemX = 50;
+      const qtyX = 250;
+      const priceX = 320;
+      const totalX = 400;
 
     doc
       .fontSize(12)
@@ -263,12 +263,29 @@ exports.downloadUserInvoicePdf = async (req, res) => {
 
       position += 20;
     });
+     
+    doc.y = position + 20;
+
+    const subtotal = invoice.items.reduce((sum, item) => {
+      return sum + Number(item.quantity) * Number(item.price);
+    }, 0);
+
+    const gstPercent = Number(invoice.gstPercent) || 0;
+    const gstAmount = Number(invoice.gstAmount) || 0;
+    const discount = Number(invoice.discount) || 0;
+    const totalAmount = Number(invoice.totalAmount) || 0;
 
     doc.moveDown(2);
 
     doc
+      .fontSize(12)
+      .text(`Subtotal : ₹${subtotal}`, { align: "right" })
+      .text(`GST (${gstPercent}%) : ₹${gstAmount}`, { align: "right" })
+      .text(`Discount : ₹${discount}`, { align: "right" });
+
+    doc
       .fontSize(14)
-      .text(`Grand Total: ₹${invoice.totalAmount}`, {
+      .text(`Grand Total : ₹${totalAmount}`, {
         align: "right",
       });
 

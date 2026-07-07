@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
+import billoraLogo from "../src/assets/billora.png";
 
 function Dashboard() {
   const [invoices, setInvoices] = useState([]);
@@ -9,20 +10,17 @@ function Dashboard() {
   const navigate = useNavigate();
 
   const markPaid = async (id) => {
-  try {
-    await API.put(`/invoices/${id}/paid`);
-
-    setInvoices(
-      invoices.map((inv) =>
-        inv._id === id
-          ? { ...inv, status: "Paid" }
-          : inv
-      )
-    );
-  } catch (error) {
-    alert("Failed to update status");
-  }
-};
+    try {
+      await API.put(`/invoices/${id}/paid`);
+      setInvoices(
+        invoices.map((inv) =>
+          inv._id === id ? { ...inv, status: "Paid" } : inv
+        )
+      );
+    } catch (error) {
+      alert("Failed to update status");
+    }
+  };
 
   const fetchInvoices = async () => {
     const res = await API.get("/invoices");
@@ -98,7 +96,6 @@ function Dashboard() {
       link.click();
     } catch (error) {
       alert("Download failed");
-      console.log("error-", error);
     }
   };
 
@@ -121,20 +118,57 @@ function Dashboard() {
       alert(error.response?.data?.message || "Upgrade to Pro failed");
     }
   };
-return (
+
+  return (
     <div className="app-page">
       <nav className="app-nav">
         <div className="app-shell d-flex justify-content-between align-items-center py-3">
-          <div className="d-flex align-items-center gap-2">
-            <span className="brand-mark">B</span>
+          <div className="d-flex align-items-center gap-3">
+            <div
+              className="d-flex align-items-center justify-content-center"
+              style={{ width: 44, height: 44 }}
+            >
+              <img
+                src={billoraLogo}
+                alt="Billora Logo"
+                style={{
+                  width: "48px",
+                  height: "48px",
+                  objectFit: "contain",
+                }}
+              />
+            </div>
             <div>
-              <div className="brand-title">Billora</div>
-              <small className="brand-subtitle">Invoice workspace</small>
+              <div className="brand-title fs-5">Billora</div>
+              <small className="text-soft" style={{ fontSize: "0.75rem" }}>Invoice workspace</small>
             </div>
           </div>
+
           <div className="d-flex align-items-center gap-3">
-            <span className="fw-semibold d-none d-sm-inline">{profile?.businessName}</span>
-            <button className="btn btn-outline-secondary btn-sm" onClick={handleLogout}>Logout</button>
+            <div
+              className="d-flex align-items-center gap-2 px-3 py-1"
+              style={{
+                borderRadius: "999px",
+                background: "rgba(79, 70, 229, 0.06)",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                color: "var(--brand)"
+              }}
+            >
+              <div style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: "var(--success)"
+              }} />
+              {profile?.businessName || "Business"}
+            </div>
+            <button
+              className="btn btn-outline-secondary btn-sm"
+              onClick={handleLogout}
+            >
+              Logout
+            </button>
           </div>
         </div>
       </nav>
@@ -143,61 +177,84 @@ return (
         <div className="dashboard-header d-flex flex-wrap justify-content-between align-items-end gap-3">
           <div>
             <p className="metric-label mb-2">Dashboard</p>
-            <h1 className="fw-bold mb-1">Welcome{profile?.businessName ? `, ${profile.businessName}` : ""}</h1>
+            <h1 className="fw-bold mb-1">
+              Welcome{profile?.businessName ? `, ${profile.businessName}` : ""}
+            </h1>
             <p className="text-soft mb-0">Track billing activity, usage, and invoices from one place.</p>
           </div>
-          <button className="btn btn-primary" onClick={() => navigate("/create-invoice")}>Create Invoice</button>
+          <button
+            className="btn btn-primary"
+            onClick={() => navigate("/create-invoice")}
+            style={{ paddingLeft: 20, paddingRight: 20, paddingTop: 10, paddingBottom: 10 }}
+          >
+            + Create Invoice
+          </button>
         </div>
 
         <div className="row g-3 mb-4">
-          <div className="col-md-3">
-            <div className="modern-card metric-card bg-white p-3">
-              <p className="metric-label">Current Plan</p>
+          <div className="col-md-3 col-sm-6">
+            <div className="stat-card brand-accent p-4">
+              <p className="metric-label mb-2">Current Plan</p>
               <p className="metric-value">{usage?.plan ? usage.plan.toUpperCase() : "-"}</p>
             </div>
           </div>
-          <div className="col-md-3">
-            <div className="modern-card metric-card bg-white p-3">
-              <p className="metric-label">Invoices Used</p>
-              <p className="metric-value">{usage ? (usage.plan === "pro" ? usage.used : `${usage.used}/${usage.limit}`) : "-"}</p>
+          <div className="col-md-3 col-sm-6">
+            <div className="stat-card success-accent p-4">
+              <p className="metric-label mb-2">Invoices Used</p>
+              <p className="metric-value">
+                {usage
+                  ? usage.plan === "pro"
+                    ? usage.used
+                    : `${usage.used}/${usage.limit}`
+                  : "-"}
+              </p>
             </div>
           </div>
-          <div className="col-md-3">
-            <div className="modern-card metric-card bg-white p-3">
-              <p className="metric-label">15 Day Revenue</p>
-              <p className="metric-value">₹{totalRevenue}</p>
+          <div className="col-md-3 col-sm-6">
+            <div className="stat-card warning-accent p-4">
+              <p className="metric-label mb-2">15 Day Revenue</p>
+              <p className="metric-value">&#8377;{totalRevenue.toLocaleString("en-IN")}</p>
             </div>
           </div>
-          <div className="col-md-3">
-            <div className="modern-card metric-card bg-white p-3">
-              <p className="metric-label">Total Invoices</p>
+          <div className="col-md-3 col-sm-6">
+            <div className="stat-card info-accent p-4">
+              <p className="metric-label mb-2">Total Invoices</p>
               <p className="metric-value">{invoices.length}</p>
             </div>
           </div>
         </div>
 
-        <div className="modern-card bg-white p-3 mb-4">
-          <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div className="summary-card p-4 mb-4">
+          <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div>
               <h5 className="fw-bold mb-1">Plan controls</h5>
-              <p className="text-soft small mb-0">Remaining: {usage?.plan === "pro" ? "Unlimited" : usage?.remaining ?? "-"}</p>
+              <p className="text-soft small mb-0">
+                Remaining:{" "}
+                {usage?.plan === "pro" ? "Unlimited" : usage?.remaining ?? "-"}
+              </p>
             </div>
             <div className="d-flex flex-wrap gap-2">
               {usage?.plan === "free" && (
                 <>
-                  <button className="btn btn-outline-warning" onClick={handleUpgradeBasic}>Basic ₹199/month</button>
-                  <button className="btn btn-warning" onClick={handleUpgradePro}>Pro ₹399/month</button>
+                  <button className="btn btn-outline-warning btn-sm" onClick={handleUpgradeBasic}>
+                    Basic &#8377;199/month
+                  </button>
+                  <button className="btn btn-warning btn-sm" onClick={handleUpgradePro}>
+                    Pro &#8377;399/month
+                  </button>
                 </>
               )}
               {usage?.plan === "basic" && (
-                <button className="btn btn-warning" onClick={handleUpgradePro}>Upgrade to Pro ₹399/month</button>
+                <button className="btn btn-warning btn-sm" onClick={handleUpgradePro}>
+                  Upgrade to Pro &#8377;399/month
+                </button>
               )}
             </div>
           </div>
         </div>
 
         <div className="modern-card table-card bg-white">
-          <div className="p-3 border-bottom d-flex justify-content-between align-items-center">
+          <div className="p-4 border-bottom d-flex justify-content-between align-items-center">
             <h5 className="fw-bold mb-0">Invoices</h5>
             <span className="badge-plan">{invoices.length} total</span>
           </div>
@@ -207,15 +264,21 @@ return (
                 <tr>
                   <th>Invoice No</th>
                   <th>Customer</th>
-                  <th>Item</th>
-                  <th>Price</th>
-                  <th>Action</th>
+                  <th>Items</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th className="text-end">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {invoices.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="text-center text-soft py-5">No invoices yet.</td>
+                    <td colSpan={6} className="text-center text-soft py-5">
+                      <div className="empty-state">
+                        <div className="empty-state-icon">&#128196;</div>
+                        <p className="mb-0">No invoices yet. Create your first invoice to get started.</p>
+                      </div>
+                    </td>
                   </tr>
                 )}
                 {invoices.map((inv) => (
@@ -224,15 +287,42 @@ return (
                     <td>{inv.customerName}</td>
                     <td>
                       {inv.items.map((item, index) => (
-                        <div key={index}>{item.itemType} (Qty: {item.quantity})</div>
+                        <div key={index} style={{ fontSize: "0.875rem" }}>
+                          {item.itemType} <span className="text-soft">(x{item.quantity})</span>
+                        </div>
                       ))}
                     </td>
-                    <td className="fw-semibold">₹{inv.totalAmount}</td>
+                    <td className="fw-bold" style={{ color: "var(--ink)" }}>
+                      &#8377;{Number(inv.totalAmount).toLocaleString("en-IN")}
+                    </td>
                     <td>
-                      <div className="d-flex flex-wrap gap-2">
-                        <button className="btn btn-sm btn-outline-success" onClick={() => handleDownload(inv._id)}>PDF</button>
-                        <button className="btn btn-sm btn-outline-primary" onClick={() => navigate(`/edit-invoice/${inv._id}`)}>Edit</button>
-                        <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(inv._id)}>Delete</button>
+                      <span className={inv.status === "Paid" ? "invoice-status-paid" : "invoice-status-unpaid"}>
+                        {inv.status || "Unpaid"}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="d-flex flex-wrap gap-2 justify-content-end">
+                        <button
+                          className="btn btn-sm btn-outline-success"
+                          onClick={() => handleDownload(inv._id)}
+                          title="Download PDF"
+                        >
+                          &#128196; PDF
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline-primary"
+                          onClick={() => navigate(`/edit-invoice/${inv._id}`)}
+                          title="Edit Invoice"
+                        >
+                          &#9998; Edit
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline-danger"
+                          onClick={() => handleDelete(inv._id)}
+                          title="Delete Invoice"
+                        >
+                          &#128465;
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -244,7 +334,7 @@ return (
       </main>
 
       <footer className="py-4">
-        <div className="app-shell small text-soft">© {new Date().getFullYear()} Billora</div>
+        <div className="app-shell small text-soft">&copy; {new Date().getFullYear()} Billora</div>
       </footer>
     </div>
   );
