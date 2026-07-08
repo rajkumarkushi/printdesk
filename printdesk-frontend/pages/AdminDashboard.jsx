@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
 import billoraLogo from "../src/assets/billora.png";
@@ -19,6 +19,12 @@ function AdminDashboard() {
   const [invoiceModalUser, setInvoiceModalUser] = useState(null);
   const [invoiceModalInvoices, setInvoiceModalInvoices] = useState([]);
   const [invoiceModalLoading, setInvoiceModalLoading] = useState(false);
+  const [invoiceModalPage, setInvoiceModalPage] = useState(1);
+  const [invoiceModalTotalPages, setInvoiceModalTotalPages] = useState(1);
+  const [invoiceModalTotal, setInvoiceModalTotal] = useState(0);
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersTotalPages, setUsersTotalPages] = useState(1);
+  const [usersTotal, setUsersTotal] = useState(0);
 
   const navigate = useNavigate();
 
@@ -27,14 +33,19 @@ function AdminDashboard() {
     setStats(res.data);
   };
 
-  const fetchUsers = async () => {
-    const res = await API.get("/admin/users");
-    setUsers(res.data);
+  const fetchUsers = async (page = usersPage, search = searchTerm, plan = selectedPlanFilter) => {
+    const params = new URLSearchParams({ page, limit: 10 });
+    if (search && search.trim()) params.append("search", search.trim());
+    if (plan && plan !== "all") params.append("plan", plan);
+    const res = await API.get(`/admin/users?${params.toString()}`);
+    setUsers(res.data.users);
+    setUsersTotalPages(res.data.totalPages);
+    setUsersTotal(res.data.total);
   };
 
   useEffect(() => {
     fetchStats();
-    fetchUsers();
+    fetchUsers(1, "", "all");
   }, []);
 
   const handleLogout = () => {
@@ -48,7 +59,8 @@ function AdminDashboard() {
     setLoading(true);
     try {
       await API.delete(`/admin/users/${id}`);
-      await Promise.all([fetchUsers(), fetchStats()]);
+      fetchUsers(usersPage, searchTerm, selectedPlanFilter);
+      fetchStats();
     } catch (error) {
       const msg = error.response?.data?.message || "Failed to delete user";
       alert(msg);
@@ -128,7 +140,7 @@ function AdminDashboard() {
         prev.map((u) => (u._id === data._id ? data : u))
       );
       setEditingUser(null);
-      await fetchStats();
+      fetchStats();
     } catch (error) {
       const msg = error.response?.data?.message || "Failed to update user";
       alert(msg);
@@ -137,13 +149,18 @@ function AdminDashboard() {
     }
   };
 
-  const openInvoicesModal = async (user) => {
+  const openInvoicesModal = async (user, page = 1) => {
     setInvoiceModalUser(user);
+    setInvoiceModalPage(page);
     setInvoiceModalLoading(true);
-    setInvoiceModalInvoices([]);
+    if (page === 1) setInvoiceModalInvoices([]);
     try {
-      const { data } = await API.get(`/admin/users/${user._id}/invoices`);
-      setInvoiceModalInvoices(data);
+      const { data } = await API.get(
+        `/admin/users/${user._id}/invoices?page=${page}&limit=10`
+      );
+      setInvoiceModalInvoices(data.invoices);
+      setInvoiceModalTotalPages(data.totalPages);
+      setInvoiceModalTotal(data.total);
     } catch (error) {
       const msg = error.response?.data?.message || "Failed to fetch invoices";
       alert(msg);
@@ -155,6 +172,9 @@ function AdminDashboard() {
   const closeInvoicesModal = () => {
     setInvoiceModalUser(null);
     setInvoiceModalInvoices([]);
+    setInvoiceModalPage(1);
+    setInvoiceModalTotalPages(1);
+    setInvoiceModalTotal(0);
   };
 
   const handleDownloadInvoicePdf = async (user, invoiceId) => {
@@ -203,23 +223,7 @@ function AdminDashboard() {
     }
   };
 
-  const filteredUsers = useMemo(() => {
-    return users.filter((user) => {
-      const normalisedPlan = (user.plan || "free").toLowerCase();
-
-      const matchesPlan =
-        selectedPlanFilter === "all" ||
-        normalisedPlan === selectedPlanFilter;
-
-      const term = searchTerm.trim().toLowerCase();
-      const matchesSearch =
-        !term ||
-        user.businessName?.toLowerCase().includes(term) ||
-        user.email?.toLowerCase().includes(term);
-
-      return matchesPlan && matchesSearch;
-    });
-  }, [users, selectedPlanFilter, searchTerm]);
+  const filteredUsers = users;
 
   return (
     <div className="app-page">
@@ -242,9 +246,9 @@ function AdminDashboard() {
               />
             </div>
             <div>
-              <div className="brand-title fs-5">Billora Admin</div>
+              <div className="brand-title fs-5">Billora</div>
               <small className="text-soft" style={{ fontSize: "0.75rem" }}>
-                Control panel for all businesses
+                Admin
               </small>
             </div>
           </div>
@@ -297,11 +301,11 @@ function AdminDashboard() {
           <div className="d-flex flex-wrap gap-3 align-items-center justify-content-between">
             <div className="d-flex flex-wrap gap-2">
               {[
-                { key: "all", label: "All", count: filteredUsers.length },
-                { key: "free", label: "Free", count: users.filter(u => u.plan === 'free').length },
-                { key: "basic", label: "Basic", count: users.filter(u => u.plan === 'basic').length },
-                { key: "pro", label: "Pro", count: users.filter(u => u.plan === 'pro').length },
-              ].map(({ key, label, count }) => (
+                { key: "all", label: "All" },
+                { key: "free", label: "Free" },
+                { key: "basic", label: "Basic" },
+                { key: "pro", label: "Pro" },
+              ].map(({ key, label }) => (
                 <button
                   key={key}
                   type="button"
@@ -310,9 +314,13 @@ function AdminDashboard() {
                       ? "btn-primary"
                       : "btn-outline-secondary"
                   }`}
-                  onClick={() => setSelectedPlanFilter(key)}
+                  onClick={() => {
+                    setSelectedPlanFilter(key);
+                    setUsersPage(1);
+                    fetchUsers(1, searchTerm, key);
+                  }}
                 >
-                  {label} ({count})
+                  {label}
                 </button>
               ))}
             </div>
@@ -334,11 +342,42 @@ function AdminDashboard() {
               <input
                 type="text"
                 className="form-control"
-                style={{ paddingLeft: 36 }}
+                style={{ paddingLeft: 36, paddingRight: searchTerm ? 32 : 12 }}
                 placeholder="Search by business or email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setUsersPage(1);
+                    fetchUsers(1, e.target.value, selectedPlanFilter);
+                  }
+                }}
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  className="position-absolute d-flex align-items-center justify-content-center"
+                  style={{
+                    right: 8,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    color: "var(--muted)",
+                    fontSize: "1rem",
+                    cursor: "pointer",
+                    lineHeight: 1,
+                  }}
+                  onClick={() => {
+                    setSearchTerm("");
+                    setUsersPage(1);
+                    fetchUsers(1, "", selectedPlanFilter);
+                  }}
+                >
+                  &#10005;
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -347,24 +386,27 @@ function AdminDashboard() {
         <div className="admin-table-wrapper">
           <div className="p-4 border-bottom d-flex justify-content-between align-items-center">
             <h5 className="fw-bold mb-0">All Businesses</h5>
-            {loading && (
-              <span className="text-soft small">
-                <span
-                  style={{
-                    display: "inline-block",
-                    width: 14,
-                    height: 14,
-                    border: "2px solid var(--brand)",
-                    borderTopColor: "transparent",
-                    borderRadius: "50%",
-                    animation: "spin 0.6s linear infinite",
-                    marginRight: 6,
-                    verticalAlign: "middle",
-                  }}
-                />
-                Saving changes...
-              </span>
-            )}
+            <div className="d-flex align-items-center gap-3">
+              {loading && (
+                <span className="text-soft small">
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: 14,
+                      height: 14,
+                      border: "2px solid var(--brand)",
+                      borderTopColor: "transparent",
+                      borderRadius: "50%",
+                      animation: "spin 0.6s linear infinite",
+                      marginRight: 6,
+                      verticalAlign: "middle",
+                    }}
+                  />
+                  Saving changes...
+                </span>
+              )}
+              <span className="badge-plan">{usersTotal} total</span>
+            </div>
           </div>
           <div className="table-responsive">
             <table className="table table-hover align-middle mb-0">
@@ -461,6 +503,35 @@ function AdminDashboard() {
               </tbody>
             </table>
           </div>
+          {usersTotalPages > 1 && (
+            <div className="d-flex justify-content-between align-items-center px-4 py-3 border-top">
+              <small className="text-soft">
+                Page {usersPage} of {usersTotalPages}
+              </small>
+              <div className="d-flex gap-2">
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  disabled={usersPage === 1}
+                  onClick={() => {
+                    setUsersPage(usersPage - 1);
+                    fetchUsers(usersPage - 1, searchTerm, selectedPlanFilter);
+                  }}
+                >
+                  Previous
+                </button>
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  disabled={usersPage === usersTotalPages}
+                  onClick={() => {
+                    setUsersPage(usersPage + 1);
+                    fetchUsers(usersPage + 1, searchTerm, selectedPlanFilter);
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
@@ -565,10 +636,15 @@ function AdminDashboard() {
 
       {/* User Invoices Modal */}
       {invoiceModalUser && (
-        <div className="modal fade show d-block" tabIndex="-1" role="dialog">
-          <div className="modal-dialog modal-lg modal-dialog-centered" role="document">
-            <div className="modal-content" style={{ borderRadius: "var(--radius-lg)" }}>
-              <div className="modal-header">
+        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ zIndex: 1050 }}>
+          <div
+            className="position-absolute top-0 start-0 w-100 h-100"
+            style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+            onClick={closeInvoicesModal}
+          />
+          <div className="modal-dialog modal-lg" role="document" style={{ zIndex: 1051, position: "relative", margin: "1rem" }}>
+            <div className="modal-content" style={{ borderRadius: "var(--radius-lg)", maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
+              <div className="modal-header" style={{ flexShrink: 0 }}>
                 <div>
                   <h5 className="modal-title fw-bold">Invoices</h5>
                   <small className="text-soft d-block">
@@ -581,7 +657,7 @@ function AdminDashboard() {
                   onClick={closeInvoicesModal}
                 />
               </div>
-              <div className="modal-body">
+              <div className="modal-body" style={{ overflowY: "auto", flex: "1 1 auto" }}>
                 {invoiceModalLoading ? (
                   <div className="text-center py-4 text-soft">
                     <span
@@ -604,49 +680,78 @@ function AdminDashboard() {
                     No invoices found for this user.
                   </div>
                 ) : (
-                  <div className="table-responsive">
-                    <table className="table table-hover align-middle mb-0">
-                      <thead>
-                        <tr>
-                          <th>Invoice No</th>
-                          <th>Customer</th>
-                          <th>Total</th>
-                          <th>Created</th>
-                          <th className="text-end">Download</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {invoiceModalInvoices.map((inv) => (
-                          <tr key={inv._id}>
-                            <td className="fw-semibold">{inv.invoiceNumber}</td>
-                            <td>{inv.customerName}</td>
-                            <td className="fw-bold">&#8377;{inv.totalAmount}</td>
-                            <td className="text-soft">
-                              {inv.createdAt
-                                ? new Date(inv.createdAt).toLocaleString()
-                                : "-"}
-                            </td>
-                            <td className="text-end">
-                              <button
-                                className="btn btn-sm btn-success"
-                                onClick={() =>
-                                  handleDownloadInvoicePdf(
-                                    invoiceModalUser,
-                                    inv._id
-                                  )
-                                }
-                              >
-                                PDF
-                              </button>
-                            </td>
+                  <>
+                    <div className="table-responsive">
+                      <table className="table table-hover align-middle mb-0">
+                        <thead>
+                          <tr>
+                            <th>Invoice No</th>
+                            <th>Customer</th>
+                            <th>Total</th>
+                            <th>Created</th>
+                            <th className="text-end">Download</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {invoiceModalInvoices.map((inv) => (
+                            <tr key={inv._id}>
+                              <td className="fw-semibold">{inv.invoiceNumber}</td>
+                              <td>{inv.customerName}</td>
+                              <td className="fw-bold">&#8377;{inv.totalAmount}</td>
+                              <td className="text-soft">
+                                {inv.createdAt
+                                  ? new Date(inv.createdAt).toLocaleString()
+                                  : "-"}
+                              </td>
+                              <td className="text-end">
+                                <button
+                                  className="btn btn-sm btn-success"
+                                  onClick={() =>
+                                    handleDownloadInvoicePdf(
+                                      invoiceModalUser,
+                                      inv._id
+                                    )
+                                  }
+                                >
+                                  PDF
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {invoiceModalTotalPages > 1 && (
+                      <div className="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
+                        <small className="text-soft">
+                          Page {invoiceModalPage} of {invoiceModalTotalPages} &middot; {invoiceModalTotal} total
+                        </small>
+                        <div className="d-flex gap-2">
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={invoiceModalPage === 1}
+                            onClick={() =>
+                              openInvoicesModal(invoiceModalUser, invoiceModalPage - 1)
+                            }
+                          >
+                            Previous
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={invoiceModalPage === invoiceModalTotalPages}
+                            onClick={() =>
+                              openInvoicesModal(invoiceModalUser, invoiceModalPage + 1)
+                            }
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
-              <div className="modal-footer">
+              <div className="modal-footer" style={{ flexShrink: 0 }}>
                 <button
                   type="button"
                   className="btn btn-outline-secondary"
@@ -657,10 +762,6 @@ function AdminDashboard() {
               </div>
             </div>
           </div>
-          <div
-            className="modal-backdrop fade show"
-            onClick={closeInvoicesModal}
-          />
         </div>
       )}
 

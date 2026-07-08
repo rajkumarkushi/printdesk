@@ -110,16 +110,27 @@ exports.createInvoice = async (req, res) => {
 };
 
 // ======================================
-// GET ALL INVOICES
+// GET ALL INVOICES (paginated)
 // ======================================
 exports.getInvoices = async (req, res) => {
   try {
-    const invoices = await Invoice.find({
-      businessId: req.user._id,
-      isDeleted: false,
-    }).sort({ createdAt: -1 });
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
+    const skip = (page - 1) * limit;
 
-    res.json(invoices);
+    const filter = { businessId: req.user._id, isDeleted: false };
+
+    const [invoices, total] = await Promise.all([
+      Invoice.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Invoice.countDocuments(filter),
+    ]);
+
+    res.json({
+      invoices,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (error) {
     console.log("GET INVOICES ERROR:", error);
     res.status(500).json({ error: error.message });

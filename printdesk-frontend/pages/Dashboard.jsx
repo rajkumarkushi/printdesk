@@ -7,24 +7,26 @@ function Dashboard() {
   const [invoices, setInvoices] = useState([]);
   const [usage, setUsage] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 10;
   const navigate = useNavigate();
 
   const markPaid = async (id) => {
     try {
       await API.put(`/invoices/${id}/paid`);
-      setInvoices(
-        invoices.map((inv) =>
-          inv._id === id ? { ...inv, status: "Paid" } : inv
-        )
-      );
+      fetchInvoices(page);
     } catch (error) {
       alert("Failed to update status");
     }
   };
 
-  const fetchInvoices = async () => {
-    const res = await API.get("/invoices");
-    setInvoices(res.data);
+  const fetchInvoices = async (currentPage = page) => {
+    const res = await API.get(`/invoices?page=${currentPage}&limit=${limit}`);
+    setInvoices(res.data.invoices);
+    setTotalPages(res.data.totalPages);
+    setTotal(res.data.total);
   };
 
   const fetchUsage = async () => {
@@ -42,9 +44,16 @@ function Dashboard() {
   };
 
   useEffect(() => {
-    fetchInvoices();
+    fetchInvoices(1);
     fetchUsage();
     fetchProfile();
+
+    if (!document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]')) {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
   }, []);
 
   const now = new Date();
@@ -72,11 +81,13 @@ function Dashboard() {
     try {
       const res = await API.delete(`/invoices/${id}`);
       if (res.status === 200 || res.status === 404) {
-        setInvoices((prev) => prev.filter((inv) => inv._id !== id));
+        fetchInvoices(page);
+        fetchUsage();
       }
     } catch (error) {
       if (error.response?.status === 404) {
-        setInvoices((prev) => prev.filter((inv) => inv._id !== id));
+        fetchInvoices(page);
+        fetchUsage();
         return;
       }
       alert(error.response?.data?.message || "Error deleting invoice");
@@ -99,25 +110,60 @@ function Dashboard() {
     }
   };
 
-  const handleUpgradeBasic = async () => {
+  const openRazorpayCheckout = async (plan) => {
     try {
-      const res = await API.post("/payments/mock-upgrade-basic");
-      alert(res.data.message);
-      window.location.reload();
+      if (typeof window.Razorpay === "undefined") {
+        alert("Payment system is loading. Please try again in a moment.");
+        return;
+      }
+
+      const { data: orderData } = await API.post("/payments/create-order", { plan });
+
+      const options = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "Billora",
+        description: `Upgrade to ${plan.charAt(0).toUpperCase() + plan.slice(1)}`,
+        order_id: orderData.orderId,
+        handler: async (response) => {
+          try {
+            const { data } = await API.post("/payments/verify-payment", {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              plan,
+            });
+            alert(data.message);
+            window.location.reload();
+          } catch (error) {
+            alert(error.response?.data?.message || "Payment verification failed");
+          }
+        },
+        prefill: {
+          name: profile?.businessName || "",
+          email: profile?.email || "",
+          contact: profile?.phone || "",
+        },
+        theme: {
+          color: "#4f46e5",
+        },
+        modal: {
+          ondismiss: () => {
+            // Payment cancelled by user
+          },
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
     } catch (error) {
-      alert(error.response?.data?.message || "Upgrade to Basic failed");
+      alert(error.response?.data?.message || "Failed to initiate payment");
     }
   };
 
-  const handleUpgradePro = async () => {
-    try {
-      const res = await API.post("/payments/mock-upgrade-pro");
-      alert(res.data.message);
-      window.location.reload();
-    } catch (error) {
-      alert(error.response?.data?.message || "Upgrade to Pro failed");
-    }
-  };
+  const handleUpgradeBasic = () => openRazorpayCheckout("basic");
+  const handleUpgradePro = () => openRazorpayCheckout("pro");
 
   return (
     <div className="app-page">
@@ -140,7 +186,7 @@ function Dashboard() {
             </div>
             <div>
               <div className="brand-title fs-5">Billora</div>
-              <small className="text-soft" style={{ fontSize: "0.75rem" }}>Invoice workspace</small>
+              <small className="text-soft" style={{ fontSize: "0.75rem" }}>User</small>
             </div>
           </div>
 
@@ -219,7 +265,7 @@ function Dashboard() {
           <div className="col-md-3 col-sm-6">
             <div className="stat-card info-accent p-4">
               <p className="metric-label mb-2">Total Invoices</p>
-              <p className="metric-value">{invoices.length}</p>
+              <p className="metric-value">{total}</p>
             </div>
           </div>
         </div>
@@ -256,7 +302,7 @@ function Dashboard() {
         <div className="modern-card table-card bg-white">
           <div className="p-4 border-bottom d-flex justify-content-between align-items-center">
             <h5 className="fw-bold mb-0">Invoices</h5>
-            <span className="badge-plan">{invoices.length} total</span>
+            <span className="badge-plan">{total} total</span>
           </div>
           <div className="table-responsive">
             <table className="table table-hover align-middle mb-0">
@@ -330,6 +376,35 @@ function Dashboard() {
               </tbody>
             </table>
           </div>
+          {totalPages > 1 && (
+            <div className="d-flex justify-content-between align-items-center px-4 py-3 border-top">
+              <small className="text-soft">
+                Page {page} of {totalPages}
+              </small>
+              <div className="d-flex gap-2">
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  disabled={page === 1}
+                  onClick={() => {
+                    setPage(page - 1);
+                    fetchInvoices(page - 1);
+                  }}
+                >
+                  Previous
+                </button>
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  disabled={page === totalPages}
+                  onClick={() => {
+                    setPage(page + 1);
+                    fetchInvoices(page + 1);
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </main>
 

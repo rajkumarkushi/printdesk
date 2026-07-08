@@ -1,6 +1,7 @@
 import { useState } from "react";
 import API from "../services/api";
 import { useNavigate, Link } from "react-router-dom";
+import billoraLogo from "../src/assets/billora.png";
 
 function Register() {
   const [form, setForm] = useState({
@@ -30,7 +31,17 @@ function Register() {
     <div className="auth-page">
       <div className="auth-card modern-card bg-white">
         <div className="mb-4 text-center">
-          <div className="brand-mark mx-auto mb-3">B</div>
+          <div className="d-flex align-items-center justify-content-center mx-auto mb-3" style={{ width: 56, height: 56 }}>
+            <img
+              src={billoraLogo}
+              alt="Billora Logo"
+              style={{
+                width: "56px",
+                height: "56px",
+                objectFit: "contain",
+              }}
+            />
+          </div>
           <div className="brand-title fs-3 mb-1">Start with Billora</div>
           <p className="text-soft mb-0 small">Create your business billing workspace.</p>
         </div>

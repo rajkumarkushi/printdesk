@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import billoraLogo from "../src/assets/billora.png";
 
 function Landing() {
   return (
@@ -6,7 +7,17 @@ function Landing() {
       <nav className="app-nav sticky-top">
         <div className="app-shell d-flex justify-content-between align-items-center py-3">
           <Link className="d-flex align-items-center gap-2" to="/">
-            <span className="brand-mark">B</span>
+            <div className="d-flex align-items-center justify-content-center" style={{ width: 48, height: 48 }}>
+              <img
+                src={billoraLogo}
+                alt="Billora Logo"
+                style={{
+                  width: "48px",
+                  height: "48px",
+                  objectFit: "contain",
+                }}
+              />
+            </div>
             <span className="brand-title fs-5">Billora</span>
           </Link>
           <div className="d-flex gap-2">

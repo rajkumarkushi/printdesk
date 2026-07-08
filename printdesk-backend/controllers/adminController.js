@@ -47,19 +47,51 @@ exports.getAdminStats = async (req, res) => {
 };
 
 // =====================
-// GET ALL USERS
+// GET ALL USERS (paginated)
 // =====================
 exports.getAllUsers = async (req, res) => {
   try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
+    const skip = (page - 1) * limit;
+
     const baseUserQuery = {
       $or: [{ role: "user" }, { role: { $exists: false } }],
     };
 
-    const users = await Business.find(baseUserQuery)
-      .select("-password")
-      .sort({ createdAt: -1 });
+    const { search, plan } = req.query;
 
-    res.json(users);
+    if (plan && ["free", "basic", "pro"].includes(plan)) {
+      baseUserQuery.plan = plan;
+    }
+
+    if (search && search.trim()) {
+      const term = search.trim();
+      baseUserQuery.$and = [
+        {
+          $or: [
+            { businessName: { $regex: term, $options: "i" } },
+            { email: { $regex: term, $options: "i" } },
+          ],
+        },
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      Business.find(baseUserQuery)
+        .select("-password")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Business.countDocuments(baseUserQuery),
+    ]);
+
+    res.json({
+      users,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -113,16 +145,27 @@ exports.deleteUser = async (req, res) => {
 };
 
 // =====================
-// GET USER INVOICES
+// GET USER INVOICES (paginated)
 // =====================
 exports.getUserInvoices = async (req, res) => {
   try {
-    const invoices = await Invoice.find({
-      businessId: req.params.id,
-    })
-      .sort({ createdAt: -1 });
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
+    const skip = (page - 1) * limit;
 
-    res.json(invoices);
+    const filter = { businessId: req.params.id, isDeleted: false };
+
+    const [invoices, total] = await Promise.all([
+      Invoice.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Invoice.countDocuments(filter),
+    ]);
+
+    res.json({
+      invoices,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
