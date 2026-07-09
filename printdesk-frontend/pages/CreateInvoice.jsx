@@ -1,6 +1,7 @@
 import { useState } from "react";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
+import ThemeToggle from "../src/components/ThemeToggle";
 
 function CreateInvoice() {
   const navigate = useNavigate();
@@ -27,7 +28,7 @@ function CreateInvoice() {
 
   const totalAmount = Math.max(
     0,
-    subtotal + gstAmount - Number(discount || 0)
+    subtotal - gstAmount - Number(discount || 0)
   );
 
   const handleSubmit = async (e) => {
@@ -56,13 +57,16 @@ function CreateInvoice() {
             <p className="metric-label mb-1">New invoice</p>
             <h3 className="fw-bold mb-0">Create Invoice</h3>
           </div>
-          <button
-            type="button"
-            className="btn btn-outline-secondary btn-sm"
-            onClick={() => navigate(-1)}
-          >
-            &times; Close
-          </button>
+          <div className="d-flex gap-2">
+            <ThemeToggle />
+            <button
+              type="button"
+              className="btn btn-outline-secondary btn-sm"
+              onClick={() => navigate(-1)}
+            >
+              &times; Close
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit}>

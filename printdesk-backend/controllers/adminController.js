@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const PDFDocument = require("pdfkit");
+const QRCode = require("qrcode");
 const Business = require("../models/Business");
 const Invoice = require("../models/Invoice");
 
@@ -59,7 +60,7 @@ exports.getAllUsers = async (req, res) => {
       $or: [{ role: "user" }, { role: { $exists: false } }],
     };
 
-    const { search, plan } = req.query;
+    const { search, plan, startDate, endDate } = req.query;
 
     if (plan && ["free", "basic", "pro"].includes(plan)) {
       baseUserQuery.plan = plan;
@@ -75,6 +76,16 @@ exports.getAllUsers = async (req, res) => {
           ],
         },
       ];
+    }
+
+    if (startDate) {
+      baseUserQuery.createdAt = { ...baseUserQuery.createdAt, $gte: new Date(startDate) };
+    }
+
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      baseUserQuery.createdAt = { ...baseUserQuery.createdAt, $lte: end };
     }
 
     const [users, total] = await Promise.all([
@@ -216,128 +227,137 @@ exports.downloadUserInvoicePdf = async (req, res) => {
       return res.status(404).json({ message: "Invoice not found for this user" });
     }
 
-    // Total active invoices for this user
-    const totalUserInvoices = await Invoice.countDocuments({
-      businessId: business._id,
-      isDeleted: false,
+    const doc = new PDFDocument({
+      size: [226, 700],
+      margin: 15,
     });
-
-    const doc = new PDFDocument({ margin: 50 });
 
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename=invoice-${invoice.invoiceNumber}.pdf`
+      `attachment; filename=receipt-${invoice.invoiceNumber}.pdf`
     );
     res.setHeader("Content-Type", "application/pdf");
 
     doc.pipe(res);
 
-    // Header with optional logo
-    let headerY = 50;
+    const logoPath = path.join(__dirname, "../assets/billora.png");
 
-    if (business.logoUrl) {
-      const logoPath = path.join(__dirname, "..", business.logoUrl);
-      if (fs.existsSync(logoPath)) {
-        try {
-          doc.image(logoPath, 50, headerY, { width: 80 });
-        } catch (e) {
-          // ignore logo rendering errors
-        }
-      }
+    if (fs.existsSync(logoPath)) {
+      doc.opacity(0.2);
+      doc.image(logoPath, 38, 180, {
+        width: 150,
+      });
+      doc.opacity(1);
     }
 
-    // Product branding
-    doc
-      .fontSize(18)
-      .text("Billora", 150, headerY, { continued: false });
+    let y = 20;
 
-    doc
-      .fontSize(10)
-      .fillColor("#555555")
-      .text("Smart Billing for Growing Businesses", 150, headerY + 22);
+    const line = () => {
+      doc.moveTo(15, y).lineTo(211, y).stroke();
+      y += 12;
+    };
 
-    // Business details block
-    const planLabel = (business.plan || "free").toUpperCase();
+    doc.font("Helvetica-Bold").fontSize(18).text("BILLORA", {
+      align: "center",
+    });
 
-    doc
-      .fontSize(12)
-      .fillColor("#000000")
-      .text(business.businessName || "Business Name", 150, headerY + 40)
-      .text(business.email || "", 150, headerY + 56)
-      .text(`Plan: ${planLabel}`, 150, headerY + 72)
-      .text(`Total Invoices (active): ${totalUserInvoices}`, 150, headerY + 88)
-      .moveDown(2);
+    y += 30;
 
-    // Invoice summary
-    doc
-      .fontSize(12)
-      .text(`Invoice No: ${invoice.invoiceNumber}`)
-      .text(`Customer: ${invoice.customerName}`)
-      .text(`Phone: ${invoice.customerPhone || "-"}`)
-      .text(`Status: ${invoice.status || "Unpaid"}`)
-      .text(`Date: ${invoice.createdAt.toDateString()}`)
-      .moveDown();
+    doc.font("Helvetica").fontSize(10);
+    doc.text(`Invoice #${invoice.invoiceNumber}`, 15, y);
+    y += 14;
+    doc.text(new Date(invoice.createdAt).toLocaleDateString(), 15, y);
 
-      // Items table 
-      const tableTop = doc.y + 10;
-      const itemX = 50;
-      const qtyX = 250;
-      const priceX = 320;
-      const totalX = 400;
+    y += 20;
+    doc.text(invoice.customerName || "-", 15, y);
+    y += 14;
+    doc.text(invoice.customerPhone || "-", 15, y);
 
-    doc
-      .fontSize(12)
-      .text("Item", itemX, tableTop)
-      .text("Qty", qtyX, tableTop)
-      .text("Price", priceX, tableTop)
-      .text("Total", totalX, tableTop);
+    y += 20;
+    line();
 
-    let position = tableTop + 25;
+    doc.font("Helvetica-Bold");
+    doc.text("Item", 15, y);
+    doc.text("Qty", 120, y);
+    doc.text("Amount", 160, y);
+
+    y += 15;
+    line();
+
+    let subtotal = 0;
 
     invoice.items.forEach((item) => {
-      const itemTotal = item.quantity * item.price;
+      const itemTotal = Number(item.quantity) * Number(item.price);
+      subtotal += itemTotal;
 
-      doc
-        .fontSize(12)
-        .text(item.itemType, itemX, position)
-        .text(item.quantity.toString(), qtyX, position)
-        .text(`₹${item.price}`, priceX, position)
-        .text(`₹${itemTotal}`, totalX, position);
+      doc.font("Helvetica").fontSize(10);
+      doc.text(item.itemType || "-", 15, y, { width: 90 });
+      doc.text(String(item.quantity), 125, y);
+      doc.text(`Rs. ${itemTotal}`, 160, y);
 
-      position += 20;
+      y += 18;
     });
-     
-    doc.y = position + 20;
 
-    const subtotal = invoice.items.reduce((sum, item) => {
-      return sum + Number(item.quantity) * Number(item.price);
-    }, 0);
+    y += 5;
+    line();
 
     const gstPercent = Number(invoice.gstPercent) || 0;
     const gstAmount = Number(invoice.gstAmount) || 0;
     const discount = Number(invoice.discount) || 0;
     const totalAmount = Number(invoice.totalAmount) || 0;
 
-    doc.moveDown(2);
+    doc.font("Helvetica").fontSize(10);
 
-    doc
-      .fontSize(12)
-      .text(`Subtotal : ₹${subtotal}`, { align: "right" })
-      .text(`GST (${gstPercent}%) : ₹${gstAmount}`, { align: "right" })
-      .text(`Discount : ₹${discount}`, { align: "right" });
+    doc.text("Subtotal", 15, y);
+    doc.text(`Rs. ${subtotal}`, 155, y);
 
-    doc
-      .fontSize(14)
-      .text(`Grand Total : ₹${totalAmount}`, {
-        align: "right",
-      });
+    y += 15;
 
-    // Footer note for admin-generated copy
-    doc
-      .moveDown(2)
-      .fontSize(9)
-      .fillColor("#777777")
-      .text("Generated via Billora Admin Dashboard", { align: "center" });
+    doc.text(`GST (${gstPercent}%)`, 15, y);
+    doc.text(`Rs. ${gstAmount}`, 155, y);
+
+    y += 15;
+
+    doc.text("Discount", 15, y);
+    doc.text(`Rs. ${discount}`, 155, y);
+
+    y += 18;
+    line();
+
+    doc.font("Helvetica-Bold").fontSize(14);
+    doc.text("TOTAL", 15, y);
+    doc.text(`Rs. ${totalAmount}`, 145, y);
+
+    y += 30;
+
+    const upiId = "yourupi@oksbi";
+    const payeeName = business.businessName || "Billora";
+    const amount = totalAmount.toFixed(2);
+
+    const upiLink =
+      `upi://pay?pa=${encodeURIComponent(upiId)}` +
+      `&pn=${encodeURIComponent(payeeName)}` +
+      `&am=${amount}` +
+      `&cu=INR`;
+
+    const qrImage = await QRCode.toDataURL(upiLink);
+
+    const qrSize = 90;
+    const qrX = doc.page.width - qrSize - 15;
+
+    doc.image(qrImage, qrX, y + 30, {
+      width: qrSize,
+      height: qrSize,
+    });
+
+    y += 140;
+    line();
+
+    doc.font("Helvetica-Bold").fontSize(12);
+    doc.text("Thank you!", 0, y, {
+      align: "center",
+      width: doc.page.width,
+    });
 
     doc.end();
   } catch (error) {
@@ -394,6 +414,7 @@ exports.downloadUserSummaryPdf = async (req, res) => {
     // Product branding
     doc
       .fontSize(18)
+      .fillColor("#000000")
       .text("Billora", 150, headerY, { continued: false });
 
     doc
@@ -401,95 +422,202 @@ exports.downloadUserSummaryPdf = async (req, res) => {
       .fillColor("#555555")
       .text("Smart Billing for Growing Businesses", 150, headerY + 22);
 
-    // Business block
-    const planLabel = (business.plan || "free").toUpperCase();
-
+    // Divider line
+    let y = headerY + 100;
     doc
+      .moveTo(50, y)
+      .lineTo(545, y)
+      .strokeColor("#cccccc")
+      .stroke();
+    y += 20;
+
+    // Business Summary section header
+    doc
+      .fontSize(14)
+      .fillColor("#000000")
+      .font("Helvetica-Bold")
+      .text("Business Summary", 50, y);
+    y += 25;
+
+    // Business details with aligned layout
+    const labelX = 50;
+    const valueX = 175;
+
+    const details = [
+      ["Business Name", business.businessName || "-"],
+      ["Owner Name", business.ownerName || "-"],
+      ["Email", business.email || "-"],
+      ["Phone", business.phone || "-"],
+      ["Address", business.address || "-"],
+      ["GST Number", business.gstNumber || "-"],
+      ["Plan", (business.plan || "free").toUpperCase()],
+      ["Invoice Limit", String(business.invoiceLimit ?? "-")],
+    ];
+
+    doc.font("Helvetica").fontSize(11);
+
+    details.forEach(([label, value], i) => {
+      const rowY = y + i * 20;
+
+      doc
+        .fillColor("#555555")
+        .text(`${label}:`, labelX, rowY, { width: 120, continued: false })
+        .fillColor("#000000")
+        .text(value, valueX, rowY, { width: 370, ellipsis: true });
+    });
+
+    y += details.length * 20 + 15;
+
+    // Divider line
+    doc
+      .moveTo(50, y)
+      .lineTo(545, y)
+      .strokeColor("#cccccc")
+      .stroke();
+    y += 20;
+
+    // Totals row
+    doc
+      .font("Helvetica-Bold")
       .fontSize(12)
       .fillColor("#000000")
-      .text("Business Summary", 50, headerY + 60)
-      .moveDown(0.5);
+      .text(`Total Active Invoices: ${totalUserInvoices}`, 50, y)
+      .text(`Total Revenue: Rs. ${totalRevenue}`, 320, y);
+    y += 25;
 
+    // Divider line
     doc
-      .fontSize(11)
-      .text(`Business Name : ${business.businessName || "-"}`)
-      .text(`Owner Name    : ${business.ownerName || "-"}`)
-      .text(`Email         : ${business.email || "-"}`)
-      .text(`Phone         : ${business.phone || "-"}`)
-      .text(`Address       : ${business.address || "-"}`)
-      .text(`GST Number    : ${business.gstNumber || "-"}`)
-      .text(`Plan          : ${planLabel}`)
-      .text(`Invoice Limit : ${business.invoiceLimit ?? "-"}`)
-      .moveDown();
+      .moveTo(50, y)
+      .lineTo(545, y)
+      .strokeColor("#cccccc")
+      .stroke();
+    y += 20;
 
+    // Invoices section header
     doc
-      .fontSize(11)
-      .text(`Total Active Invoices : ${totalUserInvoices}`)
-      .text(`Total Revenue         : ₹${totalRevenue}`)
-      .moveDown(1.5);
-
-    // Invoices section
-    doc
-      .fontSize(12)
-      .text("Invoices", { underline: true })
-      .moveDown(0.5);
+      .font("Helvetica-Bold")
+      .fontSize(14)
+      .fillColor("#000000")
+      .text("Invoices", 50, y);
+    y += 25;
 
     if (invoices.length === 0) {
-      doc.fontSize(11).text("No invoices found for this user.");
+      doc
+        .font("Helvetica")
+        .fontSize(11)
+        .fillColor("#555555")
+        .text("No invoices found for this user.", 50, y);
       doc.end();
       return;
     }
 
-    const tableTop = doc.y + 5;
-    const numX = 50;
-    const invNoX = 80;
-    const customerX = 180;
-    const totalX = 340;
-    const dateX = 420;
+    // Table column definitions
+    const columns = [
+      { label: "#", x: 50, width: 30, align: "left" },
+      { label: "Invoice No", x: 80, width: 100, align: "left" },
+      { label: "Customer", x: 180, width: 140, align: "left" },
+      { label: "Status", x: 320, width: 60, align: "left" },
+      { label: "Total", x: 380, width: 70, align: "right" },
+      { label: "Date", x: 455, width: 90, align: "left" },
+    ];
 
+    // Table header
     doc
-      .fontSize(11)
-      .text("#", numX, tableTop)
-      .text("Invoice No", invNoX, tableTop)
-      .text("Customer", customerX, tableTop)
-      .text("Total", totalX, tableTop)
-      .text("Date", dateX, tableTop);
+      .font("Helvetica-Bold")
+      .fontSize(10)
+      .fillColor("#000000");
 
-    let position = tableTop + 20;
+    columns.forEach((col) => {
+      doc.text(col.label, col.x, y, { width: col.width, align: col.align });
+    });
+
+    y += 18;
+
+    // Header underline
+    doc
+      .moveTo(50, y)
+      .lineTo(545, y)
+      .strokeColor("#000000")
+      .stroke();
+    y += 8;
+
+    // Table rows
     const maxY = doc.page.height - 80;
 
     invoices.forEach((inv, index) => {
-      if (position > maxY) {
+      if (y > maxY) {
         doc.addPage();
-        position = 60;
+        y = 60;
+
+        // Re-draw header on new page
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(10)
+          .fillColor("#000000");
+
+        columns.forEach((col) => {
+          doc.text(col.label, col.x, y, { width: col.width, align: col.align });
+        });
+
+        y += 18;
+        doc
+          .moveTo(50, y)
+          .lineTo(545, y)
+          .strokeColor("#000000")
+          .stroke();
+        y += 8;
       }
 
       doc
+        .font("Helvetica")
         .fontSize(10)
-        .text(String(index + 1), numX, position)
-        .text(inv.invoiceNumber || "-", invNoX, position)
-        .text(inv.customerName || "-", customerX, position, {
-          width: 140,
-          ellipsis: true,
-        })
-        .text(`₹${inv.totalAmount}`, totalX, position)
-        .text(
-          inv.createdAt
-            ? new Date(inv.createdAt).toLocaleDateString()
-            : "-",
-          dateX,
-          position
-        );
+        .fillColor("#000000");
 
-      position += 18;
+      const rowData = [
+        String(index + 1),
+        inv.invoiceNumber || "-",
+        inv.customerName || "-",
+        inv.status || "Unpaid",
+        `Rs. ${Number(inv.totalAmount) || 0}`,
+        inv.createdAt
+          ? new Date(inv.createdAt).toLocaleDateString("en-IN")
+          : "-",
+      ];
+
+      columns.forEach((col, i) => {
+        doc.text(rowData[i], col.x, y, {
+          width: col.width,
+          align: col.align,
+          ellipsis: true,
+        });
+      });
+
+      y += 20;
+
+      // Light row separator
+      doc
+        .moveTo(50, y - 5)
+        .lineTo(545, y - 5)
+        .strokeColor("#eeeeee")
+        .stroke();
     });
 
+    // Bottom border
     doc
-      .moveDown(2)
+      .moveTo(50, y)
+      .lineTo(545, y)
+      .strokeColor("#000000")
+      .stroke();
+    y += 25;
+
+    // Footer
+    doc
+      .font("Helvetica")
       .fontSize(9)
       .fillColor("#777777")
-      .text("User summary generated via Billora Admin Dashboard", {
+      .text("User summary generated via Billora Admin Dashboard", 50, y, {
         align: "center",
+        width: 495,
       });
 
     doc.end();

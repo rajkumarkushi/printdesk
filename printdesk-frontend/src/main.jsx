@@ -5,6 +5,11 @@ import './index.css'
 import './App.css'
 import App from './App.jsx'
 
+const savedTheme = localStorage.getItem("theme") || "system";
+const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+const effectiveTheme = savedTheme === "system" ? (prefersDark ? "dark" : "light") : savedTheme;
+document.documentElement.setAttribute("data-theme", effectiveTheme);
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />

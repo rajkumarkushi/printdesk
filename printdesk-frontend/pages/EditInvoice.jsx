@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import API from "../services/api";
 import { useNavigate, useParams } from "react-router-dom";
+import ThemeToggle from "../src/components/ThemeToggle";
 
 function EditInvoice() {
   const { id } = useParams();
@@ -48,7 +49,7 @@ function EditInvoice() {
 
   const totalAmount = Math.max(
     0,
-    subtotal + gstAmount - Number(discount || 0)
+    subtotal - gstAmount - Number(discount || 0)
   );
 
   const handleSubmit = async (e) => {
@@ -77,13 +78,16 @@ function EditInvoice() {
             <p className="metric-label mb-1">Edit invoice</p>
             <h3 className="fw-bold mb-0">Edit Invoice</h3>
           </div>
-          <button
-            type="button"
-            className="btn btn-outline-secondary btn-sm"
-            onClick={() => navigate(-1)}
-          >
-            &times; Close
-          </button>
+          <div className="d-flex gap-2">
+            <ThemeToggle />
+            <button
+              type="button"
+              className="btn btn-outline-secondary btn-sm"
+              onClick={() => navigate(-1)}
+            >
+              &times; Close
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit}>

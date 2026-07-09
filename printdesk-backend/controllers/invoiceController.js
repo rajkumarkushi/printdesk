@@ -85,9 +85,13 @@ exports.createInvoice = async (req, res) => {
 
     const totals = calculateInvoiceTotals(items, gstPercent, discount);
 
+    const globalInvoiceCount = await Invoice.countDocuments({
+      businessId: business._id,
+    });
+
     const invoice = await Invoice.create({
       businessId: business._id,
-      invoiceNumber: `INV-${invoiceCount + 1}`,
+      invoiceNumber: `INV-${globalInvoiceCount + 1}`,
       customerName,
       customerPhone,
       items: items.map((item) => ({
@@ -119,6 +123,29 @@ exports.getInvoices = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const filter = { businessId: req.user._id, isDeleted: false };
+
+    if (req.query.search && req.query.search.trim()) {
+      const search = req.query.search.trim();
+      filter.$or = [
+        { customerName: { $regex: search, $options: "i" } },
+        { customerPhone: { $regex: search, $options: "i" } },
+        { invoiceNumber: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    if (req.query.status && req.query.status !== "all") {
+      filter.status = req.query.status;
+    }
+
+    if (req.query.startDate) {
+      filter.createdAt = { ...filter.createdAt, $gte: new Date(req.query.startDate) };
+    }
+
+    if (req.query.endDate) {
+      const end = new Date(req.query.endDate);
+      end.setHours(23, 59, 59, 999);
+      filter.createdAt = { ...filter.createdAt, $lte: end };
+    }
 
     const [invoices, total] = await Promise.all([
       Invoice.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),

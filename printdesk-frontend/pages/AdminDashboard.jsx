@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
 import billoraLogo from "../src/assets/billora.png";
+import ThemeToggle from "../src/components/ThemeToggle";
 
 function AdminDashboard() {
   const [stats, setStats] = useState({});
@@ -25,6 +26,8 @@ function AdminDashboard() {
   const [usersPage, setUsersPage] = useState(1);
   const [usersTotalPages, setUsersTotalPages] = useState(1);
   const [usersTotal, setUsersTotal] = useState(0);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   const navigate = useNavigate();
 
@@ -33,10 +36,12 @@ function AdminDashboard() {
     setStats(res.data);
   };
 
-  const fetchUsers = async (page = usersPage, search = searchTerm, plan = selectedPlanFilter) => {
+  const fetchUsers = async (page = usersPage, search = searchTerm, plan = selectedPlanFilter, start = startDate, end = endDate) => {
     const params = new URLSearchParams({ page, limit: 10 });
     if (search && search.trim()) params.append("search", search.trim());
     if (plan && plan !== "all") params.append("plan", plan);
+    if (start) params.append("startDate", start);
+    if (end) params.append("endDate", end);
     const res = await API.get(`/admin/users?${params.toString()}`);
     setUsers(res.data.users);
     setUsersTotalPages(res.data.totalPages);
@@ -45,7 +50,7 @@ function AdminDashboard() {
 
   useEffect(() => {
     fetchStats();
-    fetchUsers(1, "", "all");
+    fetchUsers(1, "", "all", "", "");
   }, []);
 
   const handleLogout = () => {
@@ -59,7 +64,7 @@ function AdminDashboard() {
     setLoading(true);
     try {
       await API.delete(`/admin/users/${id}`);
-      fetchUsers(usersPage, searchTerm, selectedPlanFilter);
+      fetchUsers(usersPage, searchTerm, selectedPlanFilter, startDate, endDate);
       fetchStats();
     } catch (error) {
       const msg = error.response?.data?.message || "Failed to delete user";
@@ -232,15 +237,15 @@ function AdminDashboard() {
         <div className="app-shell d-flex justify-content-between align-items-center py-3">
           <div className="d-flex align-items-center gap-3">
             <div
-              className="d-flex align-items-center justify-content-center"
-              style={{ width: 44, height: 44 }}
+              className="d-flex align-items-center justify-content-center logo-wrap"
+              style={{ width: 44, height: 44, borderRadius: 12 }}
             >
               <img
                 src={billoraLogo}
                 alt="Billora Logo"
                 style={{
-                  width: "48px",
-                  height: "48px",
+                  width: "40px",
+                  height: "40px",
                   objectFit: "contain",
                 }}
               />
@@ -252,12 +257,15 @@ function AdminDashboard() {
               </small>
             </div>
           </div>
-          <button
-            className="btn btn-outline-secondary btn-sm"
-            onClick={handleLogout}
-          >
-            Logout
-          </button>
+          <div className="d-flex align-items-center gap-3">
+            <ThemeToggle />
+            <button
+              className="btn btn-outline-secondary btn-sm"
+              onClick={handleLogout}
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -349,7 +357,7 @@ function AdminDashboard() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     setUsersPage(1);
-                    fetchUsers(1, e.target.value, selectedPlanFilter);
+                    fetchUsers(1, e.target.value, selectedPlanFilter, startDate, endDate);
                   }
                 }}
               />
@@ -372,12 +380,38 @@ function AdminDashboard() {
                   onClick={() => {
                     setSearchTerm("");
                     setUsersPage(1);
-                    fetchUsers(1, "", selectedPlanFilter);
+                    fetchUsers(1, "", selectedPlanFilter, startDate, endDate);
                   }}
                 >
                   &#10005;
                 </button>
               )}
+            </div>
+            <div style={{ minWidth: 140 }}>
+              <input
+                type="date"
+                className="form-control"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setUsersPage(1);
+                  fetchUsers(1, searchTerm, selectedPlanFilter, e.target.value, endDate);
+                }}
+                placeholder="From date"
+              />
+            </div>
+            <div style={{ minWidth: 140 }}>
+              <input
+                type="date"
+                className="form-control"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setUsersPage(1);
+                  fetchUsers(1, searchTerm, selectedPlanFilter, startDate, e.target.value);
+                }}
+                placeholder="To date"
+              />
             </div>
           </div>
         </div>
@@ -514,7 +548,7 @@ function AdminDashboard() {
                   disabled={usersPage === 1}
                   onClick={() => {
                     setUsersPage(usersPage - 1);
-                    fetchUsers(usersPage - 1, searchTerm, selectedPlanFilter);
+                    fetchUsers(usersPage - 1, searchTerm, selectedPlanFilter, startDate, endDate);
                   }}
                 >
                   Previous
@@ -524,7 +558,7 @@ function AdminDashboard() {
                   disabled={usersPage === usersTotalPages}
                   onClick={() => {
                     setUsersPage(usersPage + 1);
-                    fetchUsers(usersPage + 1, searchTerm, selectedPlanFilter);
+                    fetchUsers(usersPage + 1, searchTerm, selectedPlanFilter, startDate, endDate);
                   }}
                 >
                   Next
@@ -554,6 +588,7 @@ function AdminDashboard() {
               borderRadius: "var(--radius-lg)",
               boxShadow: "var(--shadow-lg)",
               overflow: "hidden",
+              background: "var(--panel)",
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -643,7 +678,7 @@ function AdminDashboard() {
             onClick={closeInvoicesModal}
           />
           <div className="modal-dialog modal-lg" role="document" style={{ zIndex: 1051, position: "relative", margin: "1rem" }}>
-            <div className="modal-content" style={{ borderRadius: "var(--radius-lg)", maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
+            <div className="modal-content" style={{ borderRadius: "var(--radius-lg)", maxHeight: "90vh", display: "flex", flexDirection: "column", background: "var(--panel)" }}>
               <div className="modal-header" style={{ flexShrink: 0 }}>
                 <div>
                   <h5 className="modal-title fw-bold">Invoices</h5>

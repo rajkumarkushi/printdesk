@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
 import billoraLogo from "../src/assets/billora.png";
+import ThemeToggle from "../src/components/ThemeToggle";
 
 function Dashboard() {
   const [invoices, setInvoices] = useState([]);
@@ -10,6 +11,10 @@ function Dashboard() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const limit = 10;
   const navigate = useNavigate();
 
@@ -22,8 +27,13 @@ function Dashboard() {
     }
   };
 
-  const fetchInvoices = async (currentPage = page) => {
-    const res = await API.get(`/invoices?page=${currentPage}&limit=${limit}`);
+  const fetchInvoices = async (currentPage = page, search = searchTerm, status = statusFilter, start = startDate, end = endDate) => {
+    const params = new URLSearchParams({ page: currentPage, limit });
+    if (search && search.trim()) params.append("search", search.trim());
+    if (status && status !== "all") params.append("status", status);
+    if (start) params.append("startDate", start);
+    if (end) params.append("endDate", end);
+    const res = await API.get(`/invoices?${params.toString()}`);
     setInvoices(res.data.invoices);
     setTotalPages(res.data.totalPages);
     setTotal(res.data.total);
@@ -171,15 +181,15 @@ function Dashboard() {
         <div className="app-shell d-flex justify-content-between align-items-center py-3">
           <div className="d-flex align-items-center gap-3">
             <div
-              className="d-flex align-items-center justify-content-center"
-              style={{ width: 44, height: 44 }}
+              className="d-flex align-items-center justify-content-center logo-wrap"
+              style={{ width: 44, height: 44, borderRadius: 12 }}
             >
               <img
                 src={billoraLogo}
                 alt="Billora Logo"
                 style={{
-                  width: "48px",
-                  height: "48px",
+                  width: "40px",
+                  height: "40px",
                   objectFit: "contain",
                 }}
               />
@@ -209,6 +219,7 @@ function Dashboard() {
               }} />
               {profile?.businessName || "Business"}
             </div>
+            <ThemeToggle />
             <button
               className="btn btn-outline-secondary btn-sm"
               onClick={handleLogout}
@@ -300,9 +311,74 @@ function Dashboard() {
         </div>
 
         <div className="modern-card table-card bg-white">
-          <div className="p-4 border-bottom d-flex justify-content-between align-items-center">
-            <h5 className="fw-bold mb-0">Invoices</h5>
-            <span className="badge-plan">{total} total</span>
+          <div className="p-4 border-bottom">
+            <h5 className="fw-bold mb-3">Invoices</h5>
+            <div className="d-flex flex-wrap gap-3 align-items-end">
+              <div className="flex-grow-1" style={{ minWidth: 200 }}>
+                <label className="form-label small text-soft">Search</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Customer, phone or invoice no..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setPage(1);
+                      fetchInvoices(1, searchTerm, statusFilter, startDate, endDate);
+                    }
+                  }}
+                />
+              </div>
+              <div style={{ minWidth: 120 }}>
+                <label className="form-label small text-soft">Status</label>
+                <select
+                  className="form-select"
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value);
+                    setPage(1);
+                    fetchInvoices(1, searchTerm, e.target.value, startDate, endDate);
+                  }}
+                >
+                  <option value="all">All</option>
+                  <option value="Paid">Paid</option>
+                  <option value="Unpaid">Unpaid</option>
+                </select>
+              </div>
+              <div style={{ minWidth: 150 }}>
+                <label className="form-label small text-soft">From</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    setPage(1);
+                    fetchInvoices(1, searchTerm, statusFilter, e.target.value, endDate);
+                  }}
+                />
+              </div>
+              <div style={{ minWidth: 150 }}>
+                <label className="form-label small text-soft">To</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={endDate}
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    setPage(1);
+                    fetchInvoices(1, searchTerm, statusFilter, startDate, e.target.value);
+                  }}
+                />
+              </div>
+              <div>
+                <label className="form-label small text-soft">&nbsp;</label>
+                <div>
+                  <span className="badge-plan">{total} total</span>
+                </div>
+              </div>
+            </div>
           </div>
           <div className="table-responsive">
             <table className="table table-hover align-middle mb-0">
