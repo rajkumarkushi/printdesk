@@ -1,16 +1,42 @@
 import { useEffect, useState } from "react";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
+import billoraLogo from "../src/assets/billora.png";
+import ThemeToggle from "../src/components/ThemeToggle";
 
 function Dashboard() {
   const [invoices, setInvoices] = useState([]);
   const [usage, setUsage] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const limit = 10;
   const navigate = useNavigate();
 
-  const fetchInvoices = async () => {
-    const res = await API.get("/invoices");
-    setInvoices(res.data);
+  const markPaid = async (id) => {
+    try {
+      await API.put(`/invoices/${id}/paid`);
+      fetchInvoices(page);
+    } catch (error) {
+      alert("Failed to update status");
+    }
+  };
+
+  const fetchInvoices = async (currentPage = page, search = searchTerm, status = statusFilter, start = startDate, end = endDate) => {
+    const params = new URLSearchParams({ page: currentPage, limit });
+    if (search && search.trim()) params.append("search", search.trim());
+    if (status && status !== "all") params.append("status", status);
+    if (start) params.append("startDate", start);
+    if (end) params.append("endDate", end);
+    const res = await API.get(`/invoices?${params.toString()}`);
+    setInvoices(res.data.invoices);
+    setTotalPages(res.data.totalPages);
+    setTotal(res.data.total);
   };
 
   const fetchUsage = async () => {
@@ -23,18 +49,23 @@ function Dashboard() {
       const res = await API.get("/business/profile");
       setProfile(res.data);
     } catch (error) {
-      // If profile fetch fails, we just skip showing the name
       console.error("Failed to load business profile", error);
     }
   };
 
   useEffect(() => {
-    fetchInvoices();
+    fetchInvoices(1);
     fetchUsage();
     fetchProfile();
+
+    if (!document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]')) {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
   }, []);
 
-  // Calculate total revenue for the last 15 days based on invoice.createdAt
   const now = new Date();
   const fifteenDaysAgo = new Date();
   fifteenDaysAgo.setDate(now.getDate() - 15);
@@ -42,7 +73,7 @@ function Dashboard() {
   const recentInvoices = invoices.filter((invoice) => {
     if (!invoice.createdAt) return false;
     const created = new Date(invoice.createdAt);
-    return !isNaN(created.getTime()) && created >= fifteenDaysAgo;
+    return !Number.isNaN(created.getTime()) && created >= fifteenDaysAgo;
   });
 
   const totalRevenue = recentInvoices.reduce(
@@ -59,104 +90,138 @@ function Dashboard() {
     if (!window.confirm("Are you sure you want to delete this invoice?")) return;
     try {
       const res = await API.delete(`/invoices/${id}`);
-      // Treat 200 or 404 (already deleted) as success from UI perspective
       if (res.status === 200 || res.status === 404) {
-        setInvoices((prev) => prev.filter((inv) => inv._id !== id));
-        return;
+        fetchInvoices(page);
+        fetchUsage();
       }
     } catch (error) {
-      // Even if backend reports "not found", remove it from UI
       if (error.response?.status === 404) {
-        setInvoices((prev) => prev.filter((inv) => inv._id !== id));
+        fetchInvoices(page);
+        fetchUsage();
         return;
       }
-      const msg = error.response?.data?.message || "Error deleting invoice";
-      alert(msg);
+      alert(error.response?.data?.message || "Error deleting invoice");
     }
   };
 
-const handleDownload = async (id) => {
-  try {
-    const response = await API.get(`/invoices/${id}/pdf`, {
-      responseType: "blob",
-    });
-
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `invoice-${id}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-  } catch (error) {
-    alert("Download failed");
-    console.log("error-",error)
-    console.log("Downloading ID:", id);
-  }
-};
-
-// const handleUpgrade = async () => {
-//   const { data } = await API.post("/payments/create-order");
-
-//   const options = {
-//     key: import.meta.env.VITE_RAZORPAY_KEY,
-//     amount: data.amount,
-//     currency: data.currency,
-//     order_id: data.id,
-//     handler: async function (response) {
-//       await API.post("/payments/verify-payment", response);
-//       alert("Plan upgraded successfully!");
-//       window.location.reload();
-//     },
-//   };
-
-//   const rzp = new window.Razorpay(options);
-//   rzp.open();
-// };
-  const handleUpgradeBasic = async () => {
+  const handleDownload = async (id) => {
     try {
-      const res = await API.post("/payments/mock-upgrade-basic");
-      alert(res.data.message);
-      window.location.reload();
+      const response = await API.get(`/invoices/${id}/pdf`, {
+        responseType: "blob",
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `invoice-${id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
     } catch (error) {
-      const msg = error.response?.data?.message || "Upgrade to Basic failed";
-      alert(msg);
+      alert("Download failed");
     }
   };
 
-  const handleUpgradePro = async () => {
+  const openRazorpayCheckout = async (plan) => {
     try {
-      const res = await API.post("/payments/mock-upgrade-pro");
-      alert(res.data.message);
-      window.location.reload();
+      if (typeof window.Razorpay === "undefined") {
+        alert("Payment system is loading. Please try again in a moment.");
+        return;
+      }
+
+      const { data: orderData } = await API.post("/payments/create-order", { plan });
+
+      const options = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "Billora",
+        description: `Upgrade to ${plan.charAt(0).toUpperCase() + plan.slice(1)}`,
+        order_id: orderData.orderId,
+        handler: async (response) => {
+          try {
+            const { data } = await API.post("/payments/verify-payment", {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              plan,
+            });
+            alert(data.message);
+            window.location.reload();
+          } catch (error) {
+            alert(error.response?.data?.message || "Payment verification failed");
+          }
+        },
+        prefill: {
+          name: profile?.businessName || "",
+          email: profile?.email || "",
+          contact: profile?.phone || "",
+        },
+        theme: {
+          color: "#4f46e5",
+        },
+        modal: {
+          ondismiss: () => {
+            // Payment cancelled by user
+          },
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
     } catch (error) {
-      const msg = error.response?.data?.message || "Upgrade to Pro failed";
-      alert(msg);
+      alert(error.response?.data?.message || "Failed to initiate payment");
     }
   };
+
+  const handleUpgradeBasic = () => openRazorpayCheckout("basic");
+  const handleUpgradePro = () => openRazorpayCheckout("pro");
+
   return (
-    <div className="container-fluid">
-      <nav className="navbar navbar-dark bg-dark">
-        <div className="container-fluid px-4 d-flex justify-content-between align-items-center">
-          <div className="d-flex align-items-center gap-2">
+    <div className="app-page">
+      <nav className="app-nav">
+        <div className="app-shell d-flex justify-content-between align-items-center py-3">
+          <div className="d-flex align-items-center gap-3">
             <div
-              className="rounded-circle bg-light text-dark d-flex align-items-center justify-content-center"
-              style={{ width: 32, height: 32, fontWeight: 700 }}
+              className="d-flex align-items-center justify-content-center logo-wrap"
+              style={{ width: 44, height: 44, borderRadius: 12 }}
             >
-              B
+              <img
+                src={billoraLogo}
+                alt="Billora Logo"
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  objectFit: "contain",
+                }}
+              />
             </div>
             <div>
-              <span className="navbar-brand d-block mb-0">Billora</span>
-              <small className="text-light text-opacity-75">
-                Smart Billing for Growing Businesses
-              </small>
+              <div className="brand-title fs-5">Billora</div>
+              <small className="text-soft" style={{ fontSize: "0.75rem" }}>User</small>
             </div>
           </div>
-          <div className="d-flex flex-column align-items-end">
-            <span className="text-light fw-semibold">
-              {profile?.businessName}
-            </span>
+
+          <div className="d-flex align-items-center gap-3">
+            <div
+              className="d-flex align-items-center gap-2 px-3 py-1"
+              style={{
+                borderRadius: "999px",
+                background: "rgba(79, 70, 229, 0.06)",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                color: "var(--brand)"
+              }}
+            >
+              <div style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: "var(--success)"
+              }} />
+              {profile?.businessName || "Business"}
+            </div>
+            <ThemeToggle />
             <button
-              className="btn btn-outline-light btn-sm mt-1"
+              className="btn btn-outline-secondary btn-sm"
               onClick={handleLogout}
             >
               Logout
@@ -165,163 +230,262 @@ const handleDownload = async (id) => {
         </div>
       </nav>
 
-{usage && (
-  <div className="row mb-4">
-    <div className="col-md-4">
-      <div className="card p-3 shadow">
-        <h6>Current Plan</h6>
-        <h5>{usage.plan.toUpperCase()}</h5>
-      </div>
-    </div>
-
-    <div className="col-md-4">
-      <div className="card p-3 shadow">
-        <h6>Invoices Used</h6>
-        <h5>
-          {usage.plan === "pro"
-            ? usage.used
-            : `${usage.used} / ${usage.limit}`}
-        </h5>
-      </div>
-    </div>
-
-    <div className="col-md-4">
-      <div className="card p-3 shadow">
-        <h6>Remaining</h6>
-        <h5>{usage.plan === "pro" ? "Unlimited" : usage.remaining}</h5>
-      </div>
-    </div>
-  </div>
-
-)}
-      <div className="container-fluid mt-4">
-        <div className="row mb-4">
-          <div className="col-md-6">
-            <div className="card p-3 shadow">
-              <h5>Total Revenue (Last 15 Days)</h5>
-              <h3>₹{totalRevenue}</h3>
-            </div>
+      <main className="app-shell py-4">
+        <div className="dashboard-header d-flex flex-wrap justify-content-between align-items-end gap-3">
+          <div>
+            <p className="metric-label mb-2">Dashboard</p>
+            <h1 className="fw-bold mb-1">
+              Welcome{profile?.businessName ? `, ${profile.businessName}` : ""}
+            </h1>
+            <p className="text-soft mb-0">Track billing activity, usage, and invoices from one place.</p>
           </div>
-
-          <div className="col-md-6">
-            <div className="card p-3 shadow">
-              <h5>Total Invoices</h5>
-              <h3>{invoices.length}</h3>
-            </div>
-          </div>
-        </div>
-
-        <div className="d-flex flex-wrap justify-content-between mb-3 gap-2">
           <button
-            className="btn btn-primary mb-2"
+            className="btn btn-primary"
             onClick={() => navigate("/create-invoice")}
+            style={{ paddingLeft: 20, paddingRight: 20, paddingTop: 10, paddingBottom: 10 }}
           >
-            Create Invoice
+            + Create Invoice
           </button>
-          <div className="d-flex flex-wrap gap-2">
-            {usage?.plan === "free" && (
-              <>
-                <button
-                  className="btn btn-outline-warning mb-2"
-                  onClick={handleUpgradeBasic}
-                >
-                  Upgrade to Basic – ₹199/month (200 invoices)
-                </button>
-                <button
-                  className="btn btn-warning mb-2"
-                  onClick={handleUpgradePro}
-                >
-                  Go Pro – ₹399/month (Unlimited)
-                </button>
-              </>
-            )}
-            {usage?.plan === "basic" && (
-              <button
-                className="btn btn-warning mb-2"
-                onClick={handleUpgradePro}
-              >
-                Upgrade to Pro – ₹399/month (Unlimited)
-              </button>
-            )}
+        </div>
+
+        <div className="row g-3 mb-4">
+          <div className="col-md-3 col-sm-6">
+            <div className="stat-card brand-accent p-4">
+              <p className="metric-label mb-2">Current Plan</p>
+              <p className="metric-value">{usage?.plan ? usage.plan.toUpperCase() : "-"}</p>
+            </div>
+          </div>
+          <div className="col-md-3 col-sm-6">
+            <div className="stat-card success-accent p-4">
+              <p className="metric-label mb-2">Invoices Used</p>
+              <p className="metric-value">
+                {usage
+                  ? usage.plan === "pro"
+                    ? usage.used
+                    : `${usage.used}/${usage.limit}`
+                  : "-"}
+              </p>
+            </div>
+          </div>
+          <div className="col-md-3 col-sm-6">
+            <div className="stat-card warning-accent p-4">
+              <p className="metric-label mb-2">15 Day Revenue</p>
+              <p className="metric-value">&#8377;{totalRevenue.toLocaleString("en-IN")}</p>
+            </div>
+          </div>
+          <div className="col-md-3 col-sm-6">
+            <div className="stat-card info-accent p-4">
+              <p className="metric-label mb-2">Total Invoices</p>
+              <p className="metric-value">{total}</p>
+            </div>
           </div>
         </div>
 
-        <div className="table-responsive">
-          <table className="table table-bordered mb-0">
-            <thead className="table-light">
-              <tr>
-                <th>Invoice No</th>
-                <th>Customer</th>
-                <th>Item</th>
-                <th>Price</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-           <tbody>
-              {invoices.map((inv) => (
-                <tr key={inv._id}>
-                  <td>{inv.invoiceNumber}</td>
-                  <td>{inv.customerName}</td>
-                  <td>
-                    {inv.items.map((item, index) => (
-                      <div key={index}>
-                        {item.itemType} (Qty: {item.quantity})
-                      </div>
-                    ))}
-                  </td>
-                  <td>₹{inv.totalAmount}</td>
-                  <td>
-                    <button
-                      className="btn btn-sm btn-success me-2 mb-1"
-                      onClick={() => handleDownload(inv._id)}
-                    >
-                      Download
-                    </button>
-                    <button
-                      className="btn btn-sm btn-primary me-2 mb-1"
-                      onClick={() => navigate(`/edit-invoice/${inv._id}`)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="btn btn-sm btn-outline-danger mb-1"
-                      onClick={() => handleDelete(inv._id)}
-                    >
-                      Delete
-                    </button>
-                  </td>
+        <div className="summary-card p-4 mb-4">
+          <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+              <h5 className="fw-bold mb-1">Plan controls</h5>
+              <p className="text-soft small mb-0">
+                Remaining:{" "}
+                {usage?.plan === "pro" ? "Unlimited" : usage?.remaining ?? "-"}
+              </p>
+            </div>
+            <div className="d-flex flex-wrap gap-2">
+              {usage?.plan === "free" && (
+                <>
+                  <button className="btn btn-outline-warning btn-sm" onClick={handleUpgradeBasic}>
+                    Basic &#8377;199/month
+                  </button>
+                  <button className="btn btn-warning btn-sm" onClick={handleUpgradePro}>
+                    Pro &#8377;399/month
+                  </button>
+                </>
+              )}
+              {usage?.plan === "basic" && (
+                <button className="btn btn-warning btn-sm" onClick={handleUpgradePro}>
+                  Upgrade to Pro &#8377;399/month
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="modern-card table-card bg-white">
+          <div className="p-4 border-bottom">
+            <h5 className="fw-bold mb-3">Invoices</h5>
+            <div className="d-flex flex-wrap gap-3 align-items-end">
+              <div className="flex-grow-1" style={{ minWidth: 200 }}>
+                <label className="form-label small text-soft">Search</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Customer, phone or invoice no..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setPage(1);
+                      fetchInvoices(1, searchTerm, statusFilter, startDate, endDate);
+                    }
+                  }}
+                />
+              </div>
+              <div style={{ minWidth: 120 }}>
+                <label className="form-label small text-soft">Status</label>
+                <select
+                  className="form-select"
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value);
+                    setPage(1);
+                    fetchInvoices(1, searchTerm, e.target.value, startDate, endDate);
+                  }}
+                >
+                  <option value="all">All</option>
+                  <option value="Paid">Paid</option>
+                  <option value="Unpaid">Unpaid</option>
+                </select>
+              </div>
+              <div style={{ minWidth: 150 }}>
+                <label className="form-label small text-soft">From</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    setPage(1);
+                    fetchInvoices(1, searchTerm, statusFilter, e.target.value, endDate);
+                  }}
+                />
+              </div>
+              <div style={{ minWidth: 150 }}>
+                <label className="form-label small text-soft">To</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={endDate}
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    setPage(1);
+                    fetchInvoices(1, searchTerm, statusFilter, startDate, e.target.value);
+                  }}
+                />
+              </div>
+              <div>
+                <label className="form-label small text-soft">&nbsp;</label>
+                <div>
+                  <span className="badge-plan">{total} total</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="table-responsive">
+            <table className="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Invoice No</th>
+                  <th>Customer</th>
+                  <th>Items</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th className="text-end">Actions</th>
                 </tr>
-              ))}
-    </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <footer className="bg-dark text-light mt-4 py-3">
-        <div className="container d-flex justify-content-between align-items-center">
-          <span className="text-light text-opacity-75 small">
-            © {new Date().getFullYear()} Billora
-          </span>
-          <div className="d-flex gap-3">
-            <a
-              href="https://instagram.com"
-              target="_blank"
-              rel="noreferrer"
-              className="text-light"
-            >
-              <i className="bi bi-instagram" />
-            </a>
-            <a
-              href="https://wa.me/910000000000"
-              target="_blank"
-              rel="noreferrer"
-              className="text-light"
-            >
-              <i className="bi bi-whatsapp" />
-            </a>
+              </thead>
+              <tbody>
+                {invoices.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="text-center text-soft py-5">
+                      <div className="empty-state">
+                        <div className="empty-state-icon">&#128196;</div>
+                        <p className="mb-0">No invoices yet. Create your first invoice to get started.</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                {invoices.map((inv) => (
+                  <tr key={inv._id}>
+                    <td className="fw-semibold">{inv.invoiceNumber}</td>
+                    <td>{inv.customerName}</td>
+                    <td>
+                      {inv.items.map((item, index) => (
+                        <div key={index} style={{ fontSize: "0.875rem" }}>
+                          {item.itemType} <span className="text-soft">(x{item.quantity})</span>
+                        </div>
+                      ))}
+                    </td>
+                    <td className="fw-bold" style={{ color: "var(--ink)" }}>
+                      &#8377;{Number(inv.totalAmount).toLocaleString("en-IN")}
+                    </td>
+                    <td>
+                      <span className={inv.status === "Paid" ? "invoice-status-paid" : "invoice-status-unpaid"}>
+                        {inv.status || "Unpaid"}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="d-flex flex-wrap gap-2 justify-content-end">
+                        <button
+                          className="btn btn-sm btn-outline-success"
+                          onClick={() => handleDownload(inv._id)}
+                          title="Download PDF"
+                        >
+                          &#128196; PDF
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline-primary"
+                          onClick={() => navigate(`/edit-invoice/${inv._id}`)}
+                          title="Edit Invoice"
+                        >
+                          &#9998; Edit
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline-danger"
+                          onClick={() => handleDelete(inv._id)}
+                          title="Delete Invoice"
+                        >
+                          &#128465;
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+          {totalPages > 1 && (
+            <div className="d-flex justify-content-between align-items-center px-4 py-3 border-top">
+              <small className="text-soft">
+                Page {page} of {totalPages}
+              </small>
+              <div className="d-flex gap-2">
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  disabled={page === 1}
+                  onClick={() => {
+                    setPage(page - 1);
+                    fetchInvoices(page - 1);
+                  }}
+                >
+                  Previous
+                </button>
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  disabled={page === totalPages}
+                  onClick={() => {
+                    setPage(page + 1);
+                    fetchInvoices(page + 1);
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
+      </main>
+
+      <footer className="py-4">
+        <div className="app-shell small text-soft">&copy; {new Date().getFullYear()} Billora</div>
       </footer>
     </div>
   );

@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
+import billoraLogo from "../src/assets/billora.png";
+import ThemeToggle from "../src/components/ThemeToggle";
 
 function AdminDashboard() {
   const [stats, setStats] = useState({});
@@ -18,6 +20,14 @@ function AdminDashboard() {
   const [invoiceModalUser, setInvoiceModalUser] = useState(null);
   const [invoiceModalInvoices, setInvoiceModalInvoices] = useState([]);
   const [invoiceModalLoading, setInvoiceModalLoading] = useState(false);
+  const [invoiceModalPage, setInvoiceModalPage] = useState(1);
+  const [invoiceModalTotalPages, setInvoiceModalTotalPages] = useState(1);
+  const [invoiceModalTotal, setInvoiceModalTotal] = useState(0);
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersTotalPages, setUsersTotalPages] = useState(1);
+  const [usersTotal, setUsersTotal] = useState(0);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   const navigate = useNavigate();
 
@@ -26,14 +36,21 @@ function AdminDashboard() {
     setStats(res.data);
   };
 
-  const fetchUsers = async () => {
-    const res = await API.get("/admin/users");
-    setUsers(res.data);
+  const fetchUsers = async (page = usersPage, search = searchTerm, plan = selectedPlanFilter, start = startDate, end = endDate) => {
+    const params = new URLSearchParams({ page, limit: 10 });
+    if (search && search.trim()) params.append("search", search.trim());
+    if (plan && plan !== "all") params.append("plan", plan);
+    if (start) params.append("startDate", start);
+    if (end) params.append("endDate", end);
+    const res = await API.get(`/admin/users?${params.toString()}`);
+    setUsers(res.data.users);
+    setUsersTotalPages(res.data.totalPages);
+    setUsersTotal(res.data.total);
   };
 
   useEffect(() => {
     fetchStats();
-    fetchUsers();
+    fetchUsers(1, "", "all", "", "");
   }, []);
 
   const handleLogout = () => {
@@ -47,7 +64,8 @@ function AdminDashboard() {
     setLoading(true);
     try {
       await API.delete(`/admin/users/${id}`);
-      await Promise.all([fetchUsers(), fetchStats()]);
+      fetchUsers(usersPage, searchTerm, selectedPlanFilter, startDate, endDate);
+      fetchStats();
     } catch (error) {
       const msg = error.response?.data?.message || "Failed to delete user";
       alert(msg);
@@ -58,8 +76,6 @@ function AdminDashboard() {
 
   const openEditUser = (user) => {
     const normalisedPlan = (user.plan || "free").toLowerCase();
-
-    // For pro users, treat limit as "unlimited" in the form (leave blank).
     const initialLimit =
       normalisedPlan === "pro"
         ? ""
@@ -78,7 +94,6 @@ function AdminDashboard() {
     const { name, value } = e.target;
 
     setEditingForm((prev) => {
-      // When plan changes, reset invoice limit to sensible defaults
       if (name === "plan") {
         const newPlan = value;
         let newLimit;
@@ -87,7 +102,6 @@ function AdminDashboard() {
         } else if (newPlan === "basic") {
           newLimit = 200;
         } else {
-          // pro – unlimited, don't send a hard limit
           newLimit = "";
         }
         return {
@@ -115,7 +129,6 @@ function AdminDashboard() {
     if (!editingUser) return;
     setLoading(true);
     try {
-      // For pro users, don't send a giant number – leave limit undefined to mean unlimited.
       const payloadInvoiceLimit =
         editingForm.plan === "pro" || editingForm.invoiceLimit === ""
           ? undefined
@@ -132,7 +145,7 @@ function AdminDashboard() {
         prev.map((u) => (u._id === data._id ? data : u))
       );
       setEditingUser(null);
-      await fetchStats();
+      fetchStats();
     } catch (error) {
       const msg = error.response?.data?.message || "Failed to update user";
       alert(msg);
@@ -141,13 +154,18 @@ function AdminDashboard() {
     }
   };
 
-  const openInvoicesModal = async (user) => {
+  const openInvoicesModal = async (user, page = 1) => {
     setInvoiceModalUser(user);
+    setInvoiceModalPage(page);
     setInvoiceModalLoading(true);
-    setInvoiceModalInvoices([]);
+    if (page === 1) setInvoiceModalInvoices([]);
     try {
-      const { data } = await API.get(`/admin/users/${user._id}/invoices`);
-      setInvoiceModalInvoices(data);
+      const { data } = await API.get(
+        `/admin/users/${user._id}/invoices?page=${page}&limit=10`
+      );
+      setInvoiceModalInvoices(data.invoices);
+      setInvoiceModalTotalPages(data.totalPages);
+      setInvoiceModalTotal(data.total);
     } catch (error) {
       const msg = error.response?.data?.message || "Failed to fetch invoices";
       alert(msg);
@@ -159,6 +177,9 @@ function AdminDashboard() {
   const closeInvoicesModal = () => {
     setInvoiceModalUser(null);
     setInvoiceModalInvoices([]);
+    setInvoiceModalPage(1);
+    setInvoiceModalTotalPages(1);
+    setInvoiceModalTotal(0);
   };
 
   const handleDownloadInvoicePdf = async (user, invoiceId) => {
@@ -207,282 +228,381 @@ function AdminDashboard() {
     }
   };
 
-  const filteredUsers = useMemo(() => {
-    return users.filter((user) => {
-      // Normalise plan: treat missing as "free" and compare in lowercase
-      const normalisedPlan = (user.plan || "free").toLowerCase();
-
-      const matchesPlan =
-        selectedPlanFilter === "all" ||
-        normalisedPlan === selectedPlanFilter;
-
-      const term = searchTerm.trim().toLowerCase();
-      const matchesSearch =
-        !term ||
-        user.businessName?.toLowerCase().includes(term) ||
-        user.email?.toLowerCase().includes(term);
-
-      return matchesPlan && matchesSearch;
-    });
-  }, [users, selectedPlanFilter, searchTerm]);
+  const filteredUsers = users;
 
   return (
-    <div className="container-fluid p-0 min-vh-100 bg-light">
+    <div className="app-page">
       {/* Top Navbar */}
-      <nav className="navbar navbar-dark bg-dark shadow-sm">
-        <div className="container-fluid px-4 d-flex justify-content-between align-items-center">
-          <div className="d-flex align-items-center gap-2">
+      <nav className="app-nav">
+        <div className="app-shell d-flex justify-content-between align-items-center py-3">
+          <div className="d-flex align-items-center gap-3">
             <div
-              className="rounded-circle bg-light text-dark d-flex align-items-center justify-content-center"
-              style={{ width: 32, height: 32, fontWeight: 700 }}
+              className="d-flex align-items-center justify-content-center logo-wrap"
+              style={{ width: 44, height: 44, borderRadius: 12 }}
             >
-              B
+              <img
+                src={billoraLogo}
+                alt="Billora Logo"
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  objectFit: "contain",
+                }}
+              />
             </div>
             <div>
-              <span className="navbar-brand d-block mb-0">Billora Admin</span>
-              <small className="text-light text-opacity-75">
-                Control panel for all businesses
+              <div className="brand-title fs-5">Billora</div>
+              <small className="text-soft" style={{ fontSize: "0.75rem" }}>
+                Admin
               </small>
             </div>
           </div>
-          <button
-            className="btn btn-outline-light btn-sm"
-            onClick={handleLogout}
-          >
-            Logout
-          </button>
+          <div className="d-flex align-items-center gap-3">
+            <ThemeToggle />
+            <button
+              className="btn btn-outline-secondary btn-sm"
+              onClick={handleLogout}
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </nav>
 
-      <div className="container-fluid py-4">
+      <main className="app-shell py-4">
         {/* Stats Cards */}
         <div className="row g-3 mb-4">
           <div className="col-md-3 col-sm-6">
-            <div className="card border-0 shadow-sm h-100">
-              <div className="card-body">
-                <h6 className="text-muted text-uppercase small mb-1">
-                  Total Users
-                </h6>
-                <h3 className="mb-0">{stats.totalUsers ?? 0}</h3>
-              </div>
+            <div className="stat-card brand-accent p-4">
+              <p className="metric-label mb-2">Total Users</p>
+              <p className="metric-value">{stats.totalUsers ?? 0}</p>
             </div>
           </div>
-
           <div className="col-md-3 col-sm-6">
-            <div className="card border-0 shadow-sm h-100">
-              <div className="card-body">
-                <h6 className="text-muted text-uppercase small mb-1">
-                  Free Users
-                </h6>
-                <h3 className="mb-0 text-primary">{stats.freeUsers ?? 0}</h3>
-              </div>
+            <div className="stat-card success-accent p-4">
+              <p className="metric-label mb-2">Free Users</p>
+              <p className="metric-value">{stats.freeUsers ?? 0}</p>
             </div>
           </div>
-
           <div className="col-md-3 col-sm-6">
-            <div className="card border-0 shadow-sm h-100">
-              <div className="card-body">
-                <h6 className="text-muted text-uppercase small mb-1">
-                  Basic Users
-                </h6>
-                <h3 className="mb-0 text-warning">{stats.basicUsers ?? 0}</h3>
-              </div>
+            <div className="stat-card warning-accent p-4">
+              <p className="metric-label mb-2">Basic Users</p>
+              <p className="metric-value">{stats.basicUsers ?? 0}</p>
             </div>
           </div>
-
           <div className="col-md-3 col-sm-6">
-            <div className="card border-0 shadow-sm h-100">
-              <div className="card-body">
-                <h6 className="text-muted text-uppercase small mb-1">
-                  Pro Users
-                </h6>
-                <h3 className="mb-0 text-success">{stats.proUsers ?? 0}</h3>
-              </div>
+            <div className="stat-card info-accent p-4">
+              <p className="metric-label mb-2">Pro Users</p>
+              <p className="metric-value">{stats.proUsers ?? 0}</p>
             </div>
           </div>
-
-          <div className="col-md-3 col-sm-6 mt-3">
-            <div className="card border-0 shadow-sm h-100">
-              <div className="card-body">
-                <h6 className="text-muted text-uppercase small mb-1">
-                  Total Invoices
-                </h6>
-                <h3 className="mb-0">{stats.totalInvoices ?? 0}</h3>
-              </div>
+          <div className="col-md-3 col-sm-6 mt-md-3">
+            <div className="stat-card danger-accent p-4">
+              <p className="metric-label mb-2">Total Invoices</p>
+              <p className="metric-value">{stats.totalInvoices ?? 0}</p>
             </div>
           </div>
         </div>
 
         {/* Filters + Search */}
-        <div className="card border-0 shadow-sm mb-3">
-          <div className="card-body d-flex flex-wrap gap-2 align-items-center justify-content-between">
-            <div className="btn-group" role="group" aria-label="Plan filter">
-              <button
-                type="button"
-                className={`btn btn-sm ${
-                  selectedPlanFilter === "all"
-                    ? "btn-primary"
-                    : "btn-outline-primary"
-                }`}
-                onClick={() => setSelectedPlanFilter("all")}
-              >
-                All ({filteredUsers.length})
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm ${
-                  selectedPlanFilter === "free"
-                    ? "btn-primary"
-                    : "btn-outline-primary"
-                }`}
-                onClick={() => setSelectedPlanFilter("free")}
-              >
-                Free ({users.filter(u => u.plan === 'free').length})
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm ${
-                  selectedPlanFilter === "basic"
-                    ? "btn-primary"
-                    : "btn-outline-primary"
-                }`}
-                onClick={() => setSelectedPlanFilter("basic")}
-              >
-                Basic ({users.filter(u => u.plan === 'basic').length})
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm ${
-                  selectedPlanFilter === "pro"
-                    ? "btn-primary"
-                    : "btn-outline-primary"
-                }`}
-                onClick={() => setSelectedPlanFilter("pro")}
-              >
-                Pro ({users.filter(u => u.plan === 'pro').length})
-              </button>
+        <div className="filter-bar p-3 mb-4">
+          <div className="d-flex flex-wrap gap-3 align-items-center justify-content-between">
+            <div className="d-flex flex-wrap gap-2">
+              {[
+                { key: "all", label: "All" },
+                { key: "free", label: "Free" },
+                { key: "basic", label: "Basic" },
+                { key: "pro", label: "Pro" },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`btn btn-sm ${
+                    selectedPlanFilter === key
+                      ? "btn-primary"
+                      : "btn-outline-secondary"
+                  }`}
+                  onClick={() => {
+                    setSelectedPlanFilter(key);
+                    setUsersPage(1);
+                    fetchUsers(1, searchTerm, key);
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
-            <div className="input-group input-group-sm" style={{ maxWidth: 280 }}>
-              <span className="input-group-text bg-white">
-                <i className="bi bi-search" />
+            <div className="position-relative" style={{ maxWidth: 280, width: "100%" }}>
+              <span
+                className="position-absolute"
+                style={{
+                  left: 12,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "var(--muted)",
+                  fontSize: "0.85rem",
+                  pointerEvents: "none",
+                }}
+              >
+                &#128269;
               </span>
               <input
                 type="text"
                 className="form-control"
-                placeholder="Search by business or email"
+                style={{ paddingLeft: 36, paddingRight: searchTerm ? 32 : 12 }}
+                placeholder="Search by business or email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setUsersPage(1);
+                    fetchUsers(1, e.target.value, selectedPlanFilter, startDate, endDate);
+                  }
+                }}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  className="position-absolute d-flex align-items-center justify-content-center"
+                  style={{
+                    right: 8,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    color: "var(--muted)",
+                    fontSize: "1rem",
+                    cursor: "pointer",
+                    lineHeight: 1,
+                  }}
+                  onClick={() => {
+                    setSearchTerm("");
+                    setUsersPage(1);
+                    fetchUsers(1, "", selectedPlanFilter, startDate, endDate);
+                  }}
+                >
+                  &#10005;
+                </button>
+              )}
+            </div>
+            <div style={{ minWidth: 140 }}>
+              <input
+                type="date"
+                className="form-control"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setUsersPage(1);
+                  fetchUsers(1, searchTerm, selectedPlanFilter, e.target.value, endDate);
+                }}
+                placeholder="From date"
+              />
+            </div>
+            <div style={{ minWidth: 140 }}>
+              <input
+                type="date"
+                className="form-control"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setUsersPage(1);
+                  fetchUsers(1, searchTerm, selectedPlanFilter, startDate, e.target.value);
+                }}
+                placeholder="To date"
               />
             </div>
           </div>
         </div>
 
         {/* Users Table */}
-        <div className="card border-0 shadow-sm">
-          <div className="card-body">
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <h5 className="mb-0">All Businesses</h5>
+        <div className="admin-table-wrapper">
+          <div className="p-4 border-bottom d-flex justify-content-between align-items-center">
+            <h5 className="fw-bold mb-0">All Businesses</h5>
+            <div className="d-flex align-items-center gap-3">
               {loading && (
-                <span className="text-muted small">Saving changes...</span>
+                <span className="text-soft small">
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: 14,
+                      height: 14,
+                      border: "2px solid var(--brand)",
+                      borderTopColor: "transparent",
+                      borderRadius: "50%",
+                      animation: "spin 0.6s linear infinite",
+                      marginRight: 6,
+                      verticalAlign: "middle",
+                    }}
+                  />
+                  Saving changes...
+                </span>
               )}
-            </div>
-
-            <div className="table-responsive">
-              <table className="table table-sm table-hover align-middle mb-0">
-                <thead className="table-light">
-                  <tr>
-                    <th>Business</th>
-                    <th>Email</th>
-                    <th>Plan</th>
-                    <th>Invoice Limit</th>
-                    <th>Created</th>
-                    <th style={{ width: 220 }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredUsers.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="text-center text-muted py-4">
-                        No users found.
-                      </td>
-                    </tr>
-                  )}
-                  {filteredUsers.map((user) => {
-                    const normalisedPlan = (user.plan || "free").toLowerCase();
-                    const isProPlan = normalisedPlan === "pro";
-                    const displayLimit = isProPlan ? "Unlimited" : user.invoiceLimit ?? "-";
-
-                    return (
-                      <tr key={user._id}>
-                        <td>{user.businessName}</td>
-                        <td>{user.email}</td>
-                        <td className="text-capitalize">{normalisedPlan}</td>
-                        <td>{displayLimit}</td>
-                        <td>
-                          {user.createdAt
-                            ? new Date(user.createdAt).toLocaleDateString()
-                            : "-"}
-                        </td>
-                        <td>
-                          <div className="d-flex flex-wrap gap-1">
-                            <button
-                              className="btn btn-sm btn-outline-success"
-                              onClick={() => handleDownloadUserSummaryPdf(user)}
-                            >
-                              User PDF
-                            </button>
-                            <button
-                              className="btn btn-sm btn-outline-secondary"
-                              onClick={() => openEditUser(user)}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              className="btn btn-sm btn-outline-primary"
-                              onClick={() => openInvoicesModal(user)}
-                            >
-                              Invoices
-                            </button>
-                            <button
-                              className="btn btn-sm btn-outline-danger"
-                              onClick={() => handleDeleteUser(user._id)}
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <span className="badge-plan">{usersTotal} total</span>
             </div>
           </div>
-        </div>
-      </div>
+          <div className="table-responsive">
+            <table className="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Business</th>
+                  <th>Email</th>
+                  <th>Plan</th>
+                  <th>Invoice Limit</th>
+                  <th>Created</th>
+                  <th className="text-end" style={{ minWidth: 240 }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="text-center text-soft py-5">
+                      <div className="empty-state">
+                        <div className="empty-state-icon">&#128100;</div>
+                        <p className="mb-0">No users found matching your filters.</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                {filteredUsers.map((user) => {
+                  const normalisedPlan = (user.plan || "free").toLowerCase();
+                  const isProPlan = normalisedPlan === "pro";
+                  const displayLimit = isProPlan ? "Unlimited" : user.invoiceLimit ?? "-";
 
-      {/* Edit User Modal (custom overlay to avoid backdrop blocking clicks) */}
+                  const planColors = {
+                    free: { color: "var(--brand)", bg: "rgba(79, 70, 229, 0.08)" },
+                    basic: { color: "var(--warning)", bg: "rgba(245, 158, 11, 0.08)" },
+                    pro: { color: "var(--success)", bg: "rgba(16, 185, 129, 0.08)" },
+                  };
+                  const pc = planColors[normalisedPlan] || planColors.free;
+
+                  return (
+                    <tr key={user._id}>
+                      <td className="fw-semibold">{user.businessName}</td>
+                      <td className="text-soft">{user.email}</td>
+                      <td>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            padding: "3px 10px",
+                            borderRadius: 999,
+                            fontSize: "0.78rem",
+                            fontWeight: 600,
+                            color: pc.color,
+                            background: pc.bg,
+                            textTransform: "capitalize",
+                          }}
+                        >
+                          {normalisedPlan}
+                        </span>
+                      </td>
+                      <td>{displayLimit}</td>
+                      <td className="text-soft">
+                        {user.createdAt
+                          ? new Date(user.createdAt).toLocaleDateString()
+                          : "-"}
+                      </td>
+                      <td>
+                        <div className="d-flex flex-wrap gap-2 justify-content-end">
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            onClick={() => handleDownloadUserSummaryPdf(user)}
+                          >
+                            PDF
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            onClick={() => openEditUser(user)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-primary"
+                            onClick={() => openInvoicesModal(user)}
+                          >
+                            Invoices
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-danger"
+                            onClick={() => handleDeleteUser(user._id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {usersTotalPages > 1 && (
+            <div className="d-flex justify-content-between align-items-center px-4 py-3 border-top">
+              <small className="text-soft">
+                Page {usersPage} of {usersTotalPages}
+              </small>
+              <div className="d-flex gap-2">
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  disabled={usersPage === 1}
+                  onClick={() => {
+                    setUsersPage(usersPage - 1);
+                    fetchUsers(usersPage - 1, searchTerm, selectedPlanFilter, startDate, endDate);
+                  }}
+                >
+                  Previous
+                </button>
+                <button
+                  className="btn btn-sm btn-outline-secondary"
+                  disabled={usersPage === usersTotalPages}
+                  onClick={() => {
+                    setUsersPage(usersPage + 1);
+                    fetchUsers(usersPage + 1, searchTerm, selectedPlanFilter, startDate, endDate);
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* Edit User Modal */}
       {editingUser && (
         <div
           className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
-          style={{ backgroundColor: "rgba(0,0,0,0.5)", zIndex: 1050 }}
+          style={{
+            backgroundColor: "rgba(15, 23, 42, 0.5)",
+            backdropFilter: "blur(4px)",
+            zIndex: 1050,
+          }}
           onClick={() => setEditingUser(null)}
         >
           <div
-            className="card shadow"
-            style={{ maxWidth: 500, width: "100%" }}
+            className="bg-white p-0"
+            style={{
+              maxWidth: 480,
+              width: "calc(100% - 32px)",
+              borderRadius: "var(--radius-lg)",
+              boxShadow: "var(--shadow-lg)",
+              overflow: "hidden",
+              background: "var(--panel)",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="card-header d-flex justify-content-between align-items-center">
-              <h5 className="mb-0">Edit User</h5>
+            <div
+              className="d-flex justify-content-between align-items-center p-4 border-bottom"
+            >
+              <h5 className="fw-bold mb-0">Edit User</h5>
               <button
                 type="button"
                 className="btn-close"
                 onClick={() => setEditingUser(null)}
-              ></button>
+              />
             </div>
-            <div className="card-body">
+            <div className="p-4">
               <div className="mb-3">
                 <label className="form-label">Business Name</label>
                 <input
@@ -528,10 +648,10 @@ function AdminDashboard() {
                 />
               </div>
             </div>
-            <div className="card-footer d-flex justify-content-end gap-2">
+            <div className="d-flex justify-content-end gap-2 p-4 border-top">
               <button
                 type="button"
-                className="btn btn-secondary"
+                className="btn btn-outline-secondary"
                 onClick={() => setEditingUser(null)}
               >
                 Cancel
@@ -551,13 +671,18 @@ function AdminDashboard() {
 
       {/* User Invoices Modal */}
       {invoiceModalUser && (
-        <div className="modal fade show d-block" tabIndex="-1" role="dialog">
-          <div className="modal-dialog modal-lg modal-dialog-centered" role="document">
-            <div className="modal-content">
-              <div className="modal-header">
+        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ zIndex: 1050 }}>
+          <div
+            className="position-absolute top-0 start-0 w-100 h-100"
+            style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+            onClick={closeInvoicesModal}
+          />
+          <div className="modal-dialog modal-lg" role="document" style={{ zIndex: 1051, position: "relative", margin: "1rem" }}>
+            <div className="modal-content" style={{ borderRadius: "var(--radius-lg)", maxHeight: "90vh", display: "flex", flexDirection: "column", background: "var(--panel)" }}>
+              <div className="modal-header" style={{ flexShrink: 0 }}>
                 <div>
-                  <h5 className="modal-title">Invoices</h5>
-                  <small className="text-muted d-block">
+                  <h5 className="modal-title fw-bold">Invoices</h5>
+                  <small className="text-soft d-block">
                     {invoiceModalUser.businessName} &mdash; {invoiceModalUser.email}
                   </small>
                 </div>
@@ -565,64 +690,106 @@ function AdminDashboard() {
                   type="button"
                   className="btn-close"
                   onClick={closeInvoicesModal}
-                ></button>
+                />
               </div>
-              <div className="modal-body">
+              <div className="modal-body" style={{ overflowY: "auto", flex: "1 1 auto" }}>
                 {invoiceModalLoading ? (
-                  <div className="text-center py-4 text-muted">
+                  <div className="text-center py-4 text-soft">
+                    <span
+                      style={{
+                        display: "inline-block",
+                        width: 20,
+                        height: 20,
+                        border: "2px solid var(--brand)",
+                        borderTopColor: "transparent",
+                        borderRadius: "50%",
+                        animation: "spin 0.6s linear infinite",
+                        marginRight: 8,
+                        verticalAlign: "middle",
+                      }}
+                    />
                     Loading invoices...
                   </div>
                 ) : invoiceModalInvoices.length === 0 ? (
-                  <div className="text-center py-4 text-muted">
+                  <div className="text-center py-4 text-soft">
                     No invoices found for this user.
                   </div>
                 ) : (
-                  <div className="table-responsive">
-                    <table className="table table-sm table-bordered mb-0">
-                      <thead className="table-light">
-                        <tr>
-                          <th>Invoice No</th>
-                          <th>Customer</th>
-                          <th>Total</th>
-                          <th>Created</th>
-                          <th>Download</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {invoiceModalInvoices.map((inv) => (
-                          <tr key={inv._id}>
-                            <td>{inv.invoiceNumber}</td>
-                            <td>{inv.customerName}</td>
-                            <td>₹{inv.totalAmount}</td>
-                            <td>
-                              {inv.createdAt
-                                ? new Date(inv.createdAt).toLocaleString()
-                                : "-"}
-                            </td>
-                            <td>
-                              <button
-                                className="btn btn-sm btn-success"
-                                onClick={() =>
-                                  handleDownloadInvoicePdf(
-                                    invoiceModalUser,
-                                    inv._id
-                                  )
-                                }
-                              >
-                                PDF
-                              </button>
-                            </td>
+                  <>
+                    <div className="table-responsive">
+                      <table className="table table-hover align-middle mb-0">
+                        <thead>
+                          <tr>
+                            <th>Invoice No</th>
+                            <th>Customer</th>
+                            <th>Total</th>
+                            <th>Created</th>
+                            <th className="text-end">Download</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {invoiceModalInvoices.map((inv) => (
+                            <tr key={inv._id}>
+                              <td className="fw-semibold">{inv.invoiceNumber}</td>
+                              <td>{inv.customerName}</td>
+                              <td className="fw-bold">&#8377;{inv.totalAmount}</td>
+                              <td className="text-soft">
+                                {inv.createdAt
+                                  ? new Date(inv.createdAt).toLocaleString()
+                                  : "-"}
+                              </td>
+                              <td className="text-end">
+                                <button
+                                  className="btn btn-sm btn-success"
+                                  onClick={() =>
+                                    handleDownloadInvoicePdf(
+                                      invoiceModalUser,
+                                      inv._id
+                                    )
+                                  }
+                                >
+                                  PDF
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {invoiceModalTotalPages > 1 && (
+                      <div className="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
+                        <small className="text-soft">
+                          Page {invoiceModalPage} of {invoiceModalTotalPages} &middot; {invoiceModalTotal} total
+                        </small>
+                        <div className="d-flex gap-2">
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={invoiceModalPage === 1}
+                            onClick={() =>
+                              openInvoicesModal(invoiceModalUser, invoiceModalPage - 1)
+                            }
+                          >
+                            Previous
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={invoiceModalPage === invoiceModalTotalPages}
+                            onClick={() =>
+                              openInvoicesModal(invoiceModalUser, invoiceModalPage + 1)
+                            }
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
-              <div className="modal-footer">
+              <div className="modal-footer" style={{ flexShrink: 0 }}>
                 <button
                   type="button"
-                  className="btn btn-secondary"
+                  className="btn btn-outline-secondary"
                   onClick={closeInvoicesModal}
                 >
                   Close
@@ -630,39 +797,16 @@ function AdminDashboard() {
               </div>
             </div>
           </div>
-          <div
-            className="modal-backdrop fade show"
-            onClick={closeInvoicesModal}
-          ></div>
         </div>
       )}
 
-      {/* Footer */}
-      <footer className="bg-dark text-light mt-4 py-3">
-        <div className="container d-flex justify-content-between align-items-center">
-          <span className="text-light text-opacity-75 small">
-            © {new Date().getFullYear()} Billora Admin
-          </span>
-          <div className="d-flex gap-3">
-            <a
-              href="https://instagram.com"
-              target="_blank"
-              rel="noreferrer"
-              className="text-light"
-            >
-              <i className="bi bi-instagram" />
-            </a>
-            <a
-              href="https://wa.me/910000000000"
-              target="_blank"
-              rel="noreferrer"
-              className="text-light"
-            >
-              <i className="bi bi-whatsapp" />
-            </a>
-          </div>
-        </div>
-      </footer>
+      {/* CSS for loading spinner */}
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }

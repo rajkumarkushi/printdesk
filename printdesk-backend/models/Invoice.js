@@ -29,9 +29,34 @@ const invoiceSchema = new mongoose.Schema(
       },
     ],
 
+    // GST applied as a percentage of the items subtotal.
+    // Allowed rates are enforced in the controller; common Indian slabs: 0, 5, 12, 18, 28.
+    gstPercent: {
+      type: Number,
+      default: 18,
+    },
+
+    // Computed GST amount (subtotal * gstPercent / 100). Stored so it can be
+    // rendered without re-computing even if the rate is updated later.
+    gstAmount: {
+      type: Number,
+      default: 0,
+    },
+
+    // Flat ₹ discount applied after GST.
+    discount: {
+      type: Number,
+      default: 0,
+    },
+
     totalAmount: {
       type: Number,
       required: true,
+    },
+     status: {
+      type: String,
+      enum: ["Unpaid", "Paid"],
+      default: "Unpaid",
     },
     // Soft delete flag – when true, invoice is hidden in UI but still counts towards usage
     isDeleted: {
