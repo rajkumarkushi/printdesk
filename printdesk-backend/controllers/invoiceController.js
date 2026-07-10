@@ -30,7 +30,7 @@ const calculateInvoiceTotals = (items, gstPercentInput, discountInput) => {
       ? Math.min(requestedDiscount, subtotal + gstAmount)
       : 0;
 
-  const totalAmount = Math.max(0, subtotal - gstAmount - discount);
+  const totalAmount = Math.max(0, subtotal + gstAmount - discount);
 
   return {
     subtotal,

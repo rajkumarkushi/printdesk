@@ -1,355 +1,485 @@
-const fs = require("fs");
 const path = require("path");
+const fs = require("fs");
 
-const PAGE_WIDTH_MM = 85;
+// ── Page geometry ─────────────────────────────────────────────────────────────
+const PAGE_WIDTH_MM = 80;
 const PT_PER_MM = 2.83465;
-const PAGE_WIDTH_PT = Math.round(PAGE_WIDTH_MM * PT_PER_MM); // ~241pt
-const MARGIN = 14;
-const CONTENT_WIDTH = PAGE_WIDTH_PT - MARGIN * 2;
+const PAGE_WIDTH_PT = Math.round(PAGE_WIDTH_MM * PT_PER_MM); // ≈ 227 pt
+const MARGIN = 12;
+const CONTENT_W = PAGE_WIDTH_PT - MARGIN * 2; // ≈ 203 pt
 
-const DARK = "#1a2742";      // navy used for badge / table header / total box
-const ACCENT = "#2955a3";    // mid blue used for "HOTELS", Thank You!, Visit Again
-const LIGHT_BG = "#eef2f8";  // light blue-gray box background
-const WHITE = "#ffffff";
-const TEXT = "#1a2332";
-const MUTED = "#6b7280";
-const BORDER = "#d5dbe4";
+// ── Colour palette ───────────────────────────────────────────────────────────
+const DARK     = "#1a2742";
+const ACCENT   = "#2955a3";
+const LIGHT_BG = "#eef2f8";
+const WHITE    = "#ffffff";
+const TEXT     = "#1a2332";
+const MUTED    = "#64748b";
+const BORDER   = "#cbd5e1";
 
-function fmt(n) {
-  return Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// ── Number formatter ──────────────────────────────────────────────────────────
+const fmt = (n) =>
+  Number(n || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+// ── Phone formatter ───────────────────────────────────────────────────────────
+const formatPhone = (phone) => {
+  if (!phone) return "-";
+  // Remove spaces, dashes, parentheses to check if it's a raw 10-digit number
+  const cleaned = phone.replace(/[\s\-\(\)]/g, "");
+  if (/^\d{10}$/.test(cleaned)) {
+    return `+91 ${cleaned}`;
+  }
+  return phone;
+};
+
+// ── Truncate string to fit a given pixel width at current font/size ───────────
+function truncate(doc, str, maxPx) {
+  if (!str) return "";
+  const ellipsis = "...";
+  const ellipsisW = doc.widthOfString(ellipsis);
+  if (doc.widthOfString(str) <= maxPx) return str;
+  let result = "";
+  for (let i = 0; i < str.length; i++) {
+    const candidate = str.slice(0, i + 1);
+    if (doc.widthOfString(candidate) + ellipsisW > maxPx) break;
+    result = candidate;
+  }
+  return result + ellipsis;
 }
 
-function drawDashedLine(doc, y, x1 = MARGIN, x2 = PAGE_WIDTH_PT - MARGIN, color = BORDER) {
+// ── Drawing helpers ───────────────────────────────────────────────────────────
+function dashedLine(doc, y, x1 = MARGIN, x2 = PAGE_WIDTH_PT - MARGIN, color = BORDER) {
   doc.save()
-    .strokeColor(color)
-    .lineWidth(0.75)
-    .dash(3, { space: 2.5 })
-    .moveTo(x1, y)
-    .lineTo(x2, y)
-    .stroke()
-    .undash()
+    .strokeColor(color).lineWidth(0.6)
+    .dash(2.5, { space: 2 })
+    .moveTo(x1, y).lineTo(x2, y).stroke()
+    .undash().restore();
+}
+
+function solidLine(doc, y, color = BORDER, lw = 0.75) {
+  doc.save()
+    .strokeColor(color).lineWidth(lw)
+    .moveTo(MARGIN, y).lineTo(PAGE_WIDTH_PT - MARGIN, y).stroke()
     .restore();
 }
 
-function drawSolidLine(doc, y, color = DARK) {
-  doc.save()
-    .strokeColor(color)
-    .lineWidth(1)
-    .moveTo(MARGIN, y)
-    .lineTo(PAGE_WIDTH_PT - MARGIN, y)
-    .stroke()
-    .restore();
-}
-
-// ---------- simple vector icons (drawn, not embedded images) ----------
-
-function drawCalendarIcon(doc, x, y, size, color) {
-  doc.save().strokeColor(color).lineWidth(0.9);
-  doc.roundedRect(x, y + 2, size, size - 2, 1).stroke();
-  doc.moveTo(x + size * 0.25, y).lineTo(x + size * 0.25, y + 4).stroke();
-  doc.moveTo(x + size * 0.75, y).lineTo(x + size * 0.75, y + 4).stroke();
-  doc.moveTo(x, y + size * 0.45).lineTo(x + size, y + size * 0.45).stroke();
+function filledRect(doc, x, y, w, h, r, fill, stroke = null, strokeW = 0.75) {
+  doc.save().roundedRect(x, y, w, h, r).fill(fill);
+  if (stroke) doc.roundedRect(x, y, w, h, r).strokeColor(stroke).lineWidth(strokeW).stroke();
   doc.restore();
 }
 
-function drawClockIcon(doc, x, y, size, color) {
-  const cx = x + size / 2, cy = y + size / 2, r = size / 2;
-  doc.save().strokeColor(color).lineWidth(0.9);
+// ── Icon helpers ─────────────────────────────────────────────────────────────
+function iconCalendar(doc, x, y, s, c) {
+  doc.save().strokeColor(c).lineWidth(0.8);
+  doc.roundedRect(x, y + 1.5, s, s - 1.5, 1).stroke();
+  doc.moveTo(x + s * 0.28, y).lineTo(x + s * 0.28, y + 3.5).stroke();
+  doc.moveTo(x + s * 0.72, y).lineTo(x + s * 0.72, y + 3.5).stroke();
+  doc.moveTo(x, y + s * 0.44).lineTo(x + s, y + s * 0.44).stroke();
+  doc.restore();
+}
+
+function iconClock(doc, x, y, s, c) {
+  const cx = x + s / 2, cy = y + s / 2, r = s / 2 - 0.3;
+  doc.save().strokeColor(c).lineWidth(0.8);
   doc.circle(cx, cy, r).stroke();
   doc.moveTo(cx, cy).lineTo(cx, cy - r * 0.55).stroke();
-  doc.moveTo(cx, cy).lineTo(cx + r * 0.45, cy).stroke();
+  doc.moveTo(cx, cy).lineTo(cx + r * 0.42, cy).stroke();
   doc.restore();
 }
 
-function drawHeartIcon(doc, x, y, size, color) {
-  const w = size, h = size;
-  doc.save().fillColor(color);
-  doc.path(
-    `M ${x + w / 2} ${y + h * 0.28}
-     C ${x + w / 2} ${y}, ${x} ${y}, ${x} ${y + h * 0.32}
-     C ${x} ${y + h * 0.58}, ${x + w / 2} ${y + h * 0.78}, ${x + w / 2} ${y + h}
-     C ${x + w / 2} ${y + h * 0.78}, ${x + w} ${y + h * 0.58}, ${x + w} ${y + h * 0.32}
-     C ${x + w} ${y}, ${x + w / 2} ${y}, ${x + w / 2} ${y + h * 0.28} Z`
-  ).fill();
-  doc.restore();
-}
+// ── Table column layout ────────────────────────────────────────────────────────
+// | ITEM / DESCRIPTION | QTY | RATE  | AMOUNT |
+// Shift columns left so RATE and AMOUNT have enough room for numbers like 9,000.00
+const COL = {
+  itemX: MARGIN + 6,
+  qtyX:  MARGIN + Math.round(CONTENT_W * 0.44),
+  rateX: MARGIN + Math.round(CONTENT_W * 0.55),
+  amtX:  MARGIN + Math.round(CONTENT_W * 0.74),
+};
+COL.itemW = COL.qtyX  - COL.itemX - 4;
+COL.qtyW  = COL.rateX - COL.qtyX  - 4;
+COL.rateW = COL.amtX  - COL.rateX - 4;
+COL.amtW  = (MARGIN + CONTENT_W) - COL.amtX - 6;
 
-// ---------- main template ----------
-
+// ── Main template ─────────────────────────────────────────────────────────────
 async function generateInvoicePdf(doc, invoice, business) {
-  let y = MARGIN;
+  let y = MARGIN + 4;
 
-  // ========== BUSINESS NAME ==========
-  doc.font("Helvetica-Bold").fontSize(21).fillColor(TEXT);
-  doc.text((business.businessName || "Business").toUpperCase(), MARGIN, y, {
-    width: CONTENT_WIDTH,
-    align: "center",
-    characterSpacing: 3,
-  });
-  y = doc.y + 3;
+  // ─────────────────────────────────────────────────────────────────────────
+  // HEADER
+  // ─────────────────────────────────────────────────────────────────────────
 
-  // ========== SUBTITLE (— HOTELS —) ==========
-  if (business.tagline || business.businessType) {
-    const sub = (business.tagline || business.businessType).toUpperCase();
-    doc.font("Helvetica").fontSize(10).fillColor(ACCENT);
-    doc.text(`\u2014 ${sub} \u2014`, MARGIN, y, {
-      width: CONTENT_WIDTH,
-      align: "center",
-      characterSpacing: 2,
-    });
-    y = doc.y + 6;
+  // Logo
+  const logoPath = business.logoUrl
+    ? path.join(__dirname, "../uploads", path.basename(business.logoUrl))
+    : null;
+  if (logoPath && fs.existsSync(logoPath)) {
+    const logoSize = 34;
+    try {
+      doc.image(logoPath, (PAGE_WIDTH_PT - logoSize) / 2, y, { width: logoSize, height: logoSize });
+    } catch (_) {}
+    y += logoSize + 6;
   }
 
-  // ========== ADDRESS ==========
-  if (business.address) {
-    doc.font("Helvetica").fontSize(8).fillColor(MUTED);
-    doc.text(business.address, MARGIN, y, {
-      width: CONTENT_WIDTH,
-      align: "center",
-    });
+  // Business name – always at readable size, wraps freely, tracked via doc.y
+  const bName = (business.businessName || "Business").toUpperCase();
+  doc.font("Helvetica-Bold").fontSize(16).fillColor(TEXT);
+  doc.text(bName, MARGIN, y, { width: CONTENT_W, align: "center" });
+  y = doc.y + 3;
+
+  // Tagline
+  if (business.tagline || business.businessType) {
+    const sub = (business.tagline || business.businessType).toUpperCase();
+    doc.font("Helvetica").fontSize(7.5).fillColor(ACCENT);
+    doc.text(`-- ${sub} --`, MARGIN, y, { width: CONTENT_W, align: "center" });
     y = doc.y + 3;
   }
 
-  // ========== BUSINESS PHONE ==========
-  if (business.phone) {
-    doc.font("Helvetica-Bold").fontSize(8).fillColor(TEXT);
-    doc.text(business.phone, MARGIN, y, {
-      width: CONTENT_WIDTH,
-      align: "center",
-    });
-    y = doc.y + 5;
+  // Address (allow wrap, track actual height via doc.y)
+  if (business.address) {
+    doc.font("Helvetica").fontSize(7.5).fillColor(MUTED);
+    doc.text(business.address, MARGIN, y, { width: CONTENT_W, align: "center" });
+    y = doc.y + 3;
   }
 
-  // ========== DASHED LINE ==========
-  drawDashedLine(doc, y);
+  // Phone
+  if (business.phone) {
+    doc.font("Helvetica-Bold").fontSize(8).fillColor(TEXT);
+    doc.text(formatPhone(business.phone), MARGIN, y, { width: CONTENT_W, align: "center", lineBreak: false });
+    y = doc.y + 3;
+  }
+
+  // GST number
+  if (business.gstNumber) {
+    doc.font("Helvetica").fontSize(7).fillColor(MUTED);
+    doc.text(`GST: ${business.gstNumber}`, MARGIN, y, {
+      width: CONTENT_W,
+      align: "center",
+      lineBreak: false,
+    });
+    y = doc.y + 4;
+  }
+
+  dashedLine(doc, y);
   y += 10;
 
-  // ========== INVOICE BADGE ==========
-  const badgeW = 90;
+  // ─────────────────────────────────────────────────────────────────────────
+  // INVOICE BADGE
+  // ─────────────────────────────────────────────────────────────────────────
+  const badgeW = 82;
+  const badgeH = 19;
   const badgeX = (PAGE_WIDTH_PT - badgeW) / 2;
-  doc.save().roundedRect(badgeX, y, badgeW, 22, 4).fill(DARK).restore();
-  doc.font("Helvetica-Bold").fontSize(10).fillColor(WHITE);
-  doc.text("INVOICE", badgeX, y + 6, { width: badgeW, align: "center", characterSpacing: 1.5 });
-  y += 32;
+  filledRect(doc, badgeX, y, badgeW, badgeH, 4, DARK);
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(WHITE);
+  doc.text("INVOICE", badgeX, y + 5.5, {
+    width: badgeW,
+    align: "center",
+    characterSpacing: 2,
+    lineBreak: false,
+  });
+  y += badgeH + 10;
 
-  // ========== DATE | TIME ROW ==========
-  const cols = 2;
-  const colW = CONTENT_WIDTH / cols;
+  // ─────────────────────────────────────────────────────────────────────────
+  // DATE | TIME
+  // ─────────────────────────────────────────────────────────────────────────
   const invoiceDateObj = invoice.createdAt ? new Date(invoice.createdAt) : null;
-  const invoiceDate = invoiceDateObj ? invoiceDateObj.toLocaleDateString("en-IN") : "-";
+  const invoiceDate = invoiceDateObj
+    ? invoiceDateObj.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+    : "-";
   const invoiceTime = invoiceDateObj
-    ? invoiceDateObj.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+    ? invoiceDateObj.toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      })
     : "-";
 
-  const rowData = [
-    { label: "DATE", value: invoiceDate, icon: drawCalendarIcon },
-    { label: "TIME", value: invoiceTime, icon: drawClockIcon },
-  ];
+  const halfW = CONTENT_W / 2;
+  const iconSz = 8;
 
-  const iconSize = 9;
-  rowData.forEach((col, i) => {
-    const colX = MARGIN + colW * i;
-    const labelText = col.label;
-    doc.font("Helvetica-Bold").fontSize(7);
-    const labelW = doc.widthOfString(labelText, { characterSpacing: 0.5 });
-    const groupW = iconSize + 4 + labelW;
-    const groupX = colX + (colW - groupW) / 2;
-
-    col.icon(doc, groupX, y + 1, iconSize, ACCENT);
-    doc.fillColor(MUTED).text(labelText, groupX + iconSize + 4, y, { lineBreak: false, characterSpacing: 0.5 });
-
-    doc.font("Helvetica").fontSize(9).fillColor(TEXT);
-    doc.text(col.value, colX, y + 13, { width: colW, align: "center" });
+  // Date column (left)
+  const dateLabel = "DATE";
+  doc.font("Helvetica-Bold").fontSize(6.5).fillColor(MUTED);
+  const dateLabelW = doc.widthOfString(dateLabel, { characterSpacing: 0.5 });
+  const dateGroupW = iconSz + 3 + dateLabelW;
+  const dateGroupX = MARGIN + (halfW - dateGroupW) / 2;
+  iconCalendar(doc, dateGroupX, y + 1.5, iconSz, ACCENT);
+  doc.fillColor(MUTED).text(dateLabel, dateGroupX + iconSz + 3, y + 2, {
+    lineBreak: false,
+    characterSpacing: 0.5,
   });
-  y += 32;
+  doc.font("Helvetica-Bold").fontSize(8.5).fillColor(TEXT);
+  doc.text(invoiceDate, MARGIN, y + 13, { width: halfW, align: "center", lineBreak: false });
 
-  // ========== DASHED LINE ==========
-  drawDashedLine(doc, y);
+  // Time column (right)
+  const timeLabel = "TIME";
+  doc.font("Helvetica-Bold").fontSize(6.5).fillColor(MUTED);
+  const timeLabelW = doc.widthOfString(timeLabel, { characterSpacing: 0.5 });
+  const timeGroupW = iconSz + 3 + timeLabelW;
+  const timeGroupX = MARGIN + halfW + (halfW - timeGroupW) / 2;
+  iconClock(doc, timeGroupX, y + 1.5, iconSz, ACCENT);
+  doc.fillColor(MUTED).text(timeLabel, timeGroupX + iconSz + 3, y + 2, {
+    lineBreak: false,
+    characterSpacing: 0.5,
+  });
+  doc.font("Helvetica-Bold").fontSize(8.5).fillColor(TEXT);
+  doc.text(invoiceTime, MARGIN + halfW, y + 13, {
+    width: halfW,
+    align: "center",
+    lineBreak: false,
+  });
+
+  y += 29;
+  dashedLine(doc, y);
   y += 10;
 
-  // ========== DETAILS BOX ==========
-  const boxH = 54;
-  doc.save().roundedRect(MARGIN, y, CONTENT_WIDTH, boxH, 5).fill(LIGHT_BG).restore();
+  // ─────────────────────────────────────────────────────────────────────────
+  // DETAILS BOX  – Receipt No / Customer / Payment Mode / Phone
+  // ─────────────────────────────────────────────────────────────────────────
+  const BP = 9;                                        // inner padding
+  const colInnerW = (CONTENT_W - BP * 3) / 2;
+  const leftColX  = MARGIN + BP;
+  const rightColX = MARGIN + BP * 2 + colInnerW;
 
-  const boxPad = 9;
-  const boxInnerW = (CONTENT_WIDTH - boxPad * 3) / 2;
-  const leftX = MARGIN + boxPad;
-  const rightX = MARGIN + boxPad + boxInnerW + boxPad;
-  let boxY = y + boxPad;
+  const LABEL_H  = 9;   // height of the small label line
+  const LABEL_GAP = 2;  // gap between label and value
+  const ROW_GAP  = 8;   // gap between row 1 and row 2
 
-  // Left column
-  doc.font("Helvetica-Bold").fontSize(7).fillColor(ACCENT);
-  doc.text("RECEIPT NO", leftX, boxY, { width: boxInnerW, characterSpacing: 0.3 });
-  boxY += 11;
+  // Measure actual heights so long names wrap and box expands
+  doc.font("Helvetica-Bold").fontSize(9);
+  const invNumH  = doc.heightOfString(invoice.invoiceNumber || "-", { width: colInnerW });
+  const custNameH = doc.heightOfString(invoice.customerName  || "-", { width: colInnerW });
+  const payMode   = (invoice.status === "Paid" ? "PAID" : invoice.paymentMode || "CASH").toUpperCase();
+  const payModeH  = doc.heightOfString(payMode,                  { width: colInnerW });
+  const formattedPhone = formatPhone(invoice.customerPhone);
+  const phoneH    = doc.heightOfString(formattedPhone, { width: colInnerW });
+
+  // Row heights: each row = label + gap + max(left value height, right value height)
+  const row1H = LABEL_H + LABEL_GAP + Math.max(invNumH,  custNameH);
+  const row2H = LABEL_H + LABEL_GAP + Math.max(payModeH, phoneH);
+  const actualBoxH = BP + row1H + ROW_GAP + row2H + BP;
+
+  filledRect(doc, MARGIN, y, CONTENT_W, actualBoxH, 5, LIGHT_BG);
+
+  const bY   = y + BP;            // top of row 1
+  const row2Y = bY + row1H + ROW_GAP; // top of row 2
+
+  // ── Left column: Receipt No ──
+  doc.font("Helvetica-Bold").fontSize(6.5).fillColor(ACCENT);
+  doc.text("RECEIPT NO", leftColX, bY, { width: colInnerW, lineBreak: false, characterSpacing: 0.3 });
   doc.font("Helvetica-Bold").fontSize(9).fillColor(TEXT);
-  doc.text(invoice.invoiceNumber || "-", leftX, boxY, { width: boxInnerW });
-  boxY += 17;
+  doc.text(invoice.invoiceNumber || "-", leftColX, bY + LABEL_H + LABEL_GAP, { width: colInnerW });
 
-  doc.font("Helvetica-Bold").fontSize(7).fillColor(ACCENT);
-  doc.text("PAYMENT MODE", leftX, boxY, { width: boxInnerW, characterSpacing: 0.3 });
-  boxY += 11;
+  // ── Right column: Customer (allow full wrap) ──
+  doc.font("Helvetica-Bold").fontSize(6.5).fillColor(ACCENT);
+  doc.text("CUSTOMER", rightColX, bY, { width: colInnerW, lineBreak: false, characterSpacing: 0.3 });
   doc.font("Helvetica-Bold").fontSize(9).fillColor(TEXT);
-  doc.text(invoice.status || "Unpaid", leftX, boxY, { width: boxInnerW });
+  doc.text(invoice.customerName || "-", rightColX, bY + LABEL_H + LABEL_GAP, { width: colInnerW });
 
-  // Right column
-  let rightBoxY = y + boxPad;
-  doc.font("Helvetica-Bold").fontSize(7).fillColor(ACCENT);
-  doc.text("CUSTOMER", rightX, rightBoxY, { width: boxInnerW, characterSpacing: 0.3 });
-  rightBoxY += 11;
+  // ── Left column: Payment Mode ──
+  doc.font("Helvetica-Bold").fontSize(6.5).fillColor(ACCENT);
+  doc.text("PAYMENT MODE", leftColX, row2Y, { width: colInnerW, lineBreak: false, characterSpacing: 0.3 });
   doc.font("Helvetica-Bold").fontSize(9).fillColor(TEXT);
-  doc.text(invoice.customerName || "-", rightX, rightBoxY, { width: boxInnerW, ellipsis: true });
-  rightBoxY += 17;
+  doc.text(payMode, leftColX, row2Y + LABEL_H + LABEL_GAP, { width: colInnerW, lineBreak: false });
 
-  doc.font("Helvetica-Bold").fontSize(7).fillColor(ACCENT);
-  doc.text("PHONE", rightX, rightBoxY, { width: boxInnerW, characterSpacing: 0.3 });
-  rightBoxY += 11;
+  // ── Right column: Phone ──
+  doc.font("Helvetica-Bold").fontSize(6.5).fillColor(ACCENT);
+  doc.text("PHONE", rightColX, row2Y, { width: colInnerW, lineBreak: false, characterSpacing: 0.3 });
   doc.font("Helvetica-Bold").fontSize(9).fillColor(TEXT);
-  doc.text(invoice.customerPhone || "-", rightX, rightBoxY, { width: boxInnerW, ellipsis: true });
+  doc.text(formattedPhone, rightColX, row2Y + LABEL_H + LABEL_GAP, { width: colInnerW, lineBreak: false });
 
-  y += boxH + 12;
+  y += actualBoxH + 12;
 
-  // ========== ITEMS TABLE HEADER ==========
-  const hdrH = 20;
-  doc.save().roundedRect(MARGIN, y, CONTENT_WIDTH, hdrH, 3).fill(DARK).restore();
+  // ─────────────────────────────────────────────────────────────────────────
+  // ITEMS TABLE HEADER
+  // ─────────────────────────────────────────────────────────────────────────
+  const HDR_H = 19;
+  filledRect(doc, MARGIN, y, CONTENT_W, HDR_H, 3, DARK);
 
-  const itemColX = MARGIN + 8;
-  const qtyColX = MARGIN + CONTENT_WIDTH * 0.5;
-  const rateColX = MARGIN + CONTENT_WIDTH * 0.64;
-  const amtColX = MARGIN + CONTENT_WIDTH * 0.8;
-  const itemColW = qtyColX - itemColX - 4;
-  const qtyW = rateColX - qtyColX - 4;
-  const rateW = amtColX - rateColX - 4;
-  const amtW = CONTENT_WIDTH - (amtColX - MARGIN) - 8;
+  doc.font("Helvetica-Bold").fontSize(6.5).fillColor(WHITE);
+  doc.text("ITEM", COL.itemX, y + 6, {
+    width: COL.itemW,
+    lineBreak: false,
+    characterSpacing: 0.2,
+  });
+  doc.text("QTY", COL.qtyX, y + 6, {
+    width: COL.qtyW,
+    align: "center",
+    lineBreak: false,
+  });
+  doc.text("RATE", COL.rateX, y + 6, {
+    width: COL.rateW,
+    align: "right",
+    lineBreak: false,
+  });
+  doc.text("AMOUNT", COL.amtX, y + 6, {
+    width: COL.amtW,
+    align: "right",
+    lineBreak: false,
+  });
+  y += HDR_H;
 
-  doc.font("Helvetica-Bold").fontSize(7).fillColor(WHITE);
-  doc.text("ITEM", itemColX, y + 6, { width: itemColW, characterSpacing: 0.3 });
-  doc.text("QTY", qtyColX, y + 6, { width: qtyW, align: "center", characterSpacing: 0.3 });
-  doc.text("RATE (Rs.)", rateColX, y + 6, { width: rateW, align: "right" });
-  doc.text("AMOUNT (Rs.)", amtColX, y + 6, { width: amtW, align: "right" });
-  y += hdrH;
-
-  // ========== ITEMS ROWS (white bg, thin dashed dividers) ==========
+  // ─────────────────────────────────────────────────────────────────────────
+  // ITEM ROWS
+  // ─────────────────────────────────────────────────────────────────────────
   let subtotal = 0;
-  const rowH = 24;
-  invoice.items.forEach((item, i) => {
-    const itemTotal = Number(item.quantity) * Number(item.price);
-    subtotal += itemTotal;
+  const ROW_H = 20;
 
-    doc.font("Helvetica-Bold").fontSize(9).fillColor(TEXT);
-    doc.text(item.itemType || "-", itemColX, y + 7, { width: itemColW, ellipsis: true });
-    doc.font("Helvetica").fontSize(9).fillColor(TEXT);
-    doc.text(String(item.quantity), qtyColX, y + 7, { width: qtyW, align: "center" });
-    doc.text(fmt(item.price), rateColX, y + 7, { width: rateW, align: "right" });
-    doc.font("Helvetica-Bold");
-    doc.text(fmt(itemTotal), amtColX, y + 7, { width: amtW, align: "right" });
+  invoice.items.forEach((item, idx) => {
+    const qty   = Number(item.quantity) || 0;
+    const price = Number(item.price)    || 0;
+    const total = qty * price;
+    subtotal += total;
 
-    y += rowH;
-    if (i < invoice.items.length - 1) {
-      drawDashedLine(doc, y - 4);
+    // Alternate row tint
+    if (idx % 2 === 1) {
+      filledRect(doc, MARGIN, y, CONTENT_W, ROW_H, 0, "#f8fafd");
+    }
+
+    const textY = y + 6;
+
+    // Item name – truncate to column width
+    doc.font("Helvetica-Bold").fontSize(8.5).fillColor(TEXT);
+    const itemLabel = truncate(doc.font("Helvetica-Bold").fontSize(8.5), item.itemType || "-", COL.itemW);
+    doc.text(itemLabel, COL.itemX, textY, { width: COL.itemW, lineBreak: false });
+
+    // Qty
+    doc.font("Helvetica").fontSize(8.5).fillColor(TEXT);
+    doc.text(String(qty), COL.qtyX, textY, { width: COL.qtyW, align: "center", lineBreak: false });
+
+    // Rate
+    doc.text(`${fmt(price)}`, COL.rateX, textY, { width: COL.rateW, align: "right", lineBreak: false });
+
+    // Amount (bold)
+    doc.font("Helvetica-Bold").fontSize(8.5).fillColor(TEXT);
+    doc.text(`${fmt(total)}`, COL.amtX, textY, { width: COL.amtW, align: "right", lineBreak: false });
+
+    y += ROW_H;
+
+    if (idx < invoice.items.length - 1) {
+      dashedLine(doc, y, MARGIN, PAGE_WIDTH_PT - MARGIN, "#e2e8f0");
     }
   });
 
-  // Bottom line of table
-  drawSolidLine(doc, y);
-  y += 14;
+  solidLine(doc, y, DARK, 1);
+  y += 12;
 
-  // ========== THANK YOU (left) + SUMMARY (right) ==========
-  const gstPercent = Number(invoice.gstPercent) || 0;
-  const gstAmount = Number(invoice.gstAmount) || 0;
-  const discount = Number(invoice.discount) || 0;
-  const totalAmount = Number(invoice.totalAmount) || 0;
+  // ─────────────────────────────────────────────────────────────────────────
+  // SUMMARY (right-aligned rows)
+  // ─────────────────────────────────────────────────────────────────────────
+  const gstPercent  = Number(invoice.gstPercent) || 0;
+  const gstAmount   = Number(invoice.gstAmount)  || 0;
+  const discount    = Number(invoice.discount)   || 0;
+  const totalAmount = typeof invoice.totalAmount === "number" && !isNaN(invoice.totalAmount)
+    ? invoice.totalAmount
+    : subtotal + gstAmount - discount;
   const halfGst = gstAmount / 2;
 
-  const leftColW = CONTENT_WIDTH * 0.5;
-  const summaryRightX = MARGIN + CONTENT_WIDTH * 0.55;
-  const summaryRightW = CONTENT_WIDTH * 0.45;
-  const sectionTopY = y;
+  // Label occupies the right 60% of content; value is right-aligned inside last 30%
+  const sumLabelX = MARGIN + Math.round(CONTENT_W * 0.38);
+  const sumLabelW = Math.round(CONTENT_W * 0.36);
+  const sumValX   = MARGIN + Math.round(CONTENT_W * 0.70);
+  const sumValW   = Math.round(CONTENT_W * 0.30) - 4;
+  const SUM_ROW_H = 13;
 
-  // --- Left: Thank You block ---
-  doc.font("Helvetica-BoldOblique").fontSize(15).fillColor(ACCENT);
-  doc.text("Thank You!", MARGIN, y, { width: leftColW });
-  y = doc.y + 4;
-
-  drawHeartIcon(doc, MARGIN, y, 9, ACCENT);
-  y += 15;
-
-  doc.font("Helvetica").fontSize(7.5).fillColor(MUTED);
-  doc.text("We hope you enjoyed", MARGIN, y, { width: leftColW });
-  y = doc.y + 1;
-  doc.text("your meal.", MARGIN, y, { width: leftColW });
-  y = doc.y + 8;
-
-  drawDashedLine(doc, y, MARGIN, MARGIN + leftColW - 10);
-  y += 8;
-
-  doc.font("Helvetica-Bold").fontSize(8).fillColor(ACCENT);
-  doc.text("VISIT AGAIN!", MARGIN, y, { width: leftColW, characterSpacing: 0.5 });
-  const leftBottomY = doc.y;
-
-  // --- Right: summary rows ---
-  let sumY = sectionTopY;
-  const rowGap = 15;
-
-  const summaryRow = (label, value, opts = {}) => {
-    doc.font("Helvetica-Bold").fontSize(7.5).fillColor(MUTED);
-    doc.text(label, summaryRightX, sumY, { width: summaryRightW * 0.55, characterSpacing: 0.3 });
-    doc.font(opts.bold ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(TEXT);
-    doc.text(value, summaryRightX + summaryRightW * 0.5, sumY - 1, {
-      width: summaryRightW * 0.5,
-      align: "right",
-    });
-    sumY += rowGap;
-  };
+  function summaryRow(label, value) {
+    doc.font("Helvetica").fontSize(7.5).fillColor(MUTED);
+    doc.text(label, sumLabelX, y, { width: sumLabelW, lineBreak: false });
+    doc.font("Helvetica").fontSize(8).fillColor(TEXT);
+    doc.text(value, sumValX, y, { width: sumValW, align: "right", lineBreak: false });
+    y += SUM_ROW_H;
+  }
 
   summaryRow("SUBTOTAL", `Rs.${fmt(subtotal)}`);
+
   if (gstAmount > 0) {
-    summaryRow(`CGST (${(gstPercent / 2).toFixed(1)}%)`, `Rs.${fmt(halfGst)}`);
-    summaryRow(`SGST (${(gstPercent / 2).toFixed(1)}%)`, `Rs.${fmt(halfGst)}`);
+    const halfPct = (gstPercent / 2).toFixed(1);
+    summaryRow(`CGST (${halfPct}%)`, `Rs.${fmt(halfGst)}`);
+    summaryRow(`SGST (${halfPct}%)`, `Rs.${fmt(halfGst)}`);
   }
+
+  // Discount row only if discount > 0
   if (discount > 0) {
     summaryRow("DISCOUNT", `-Rs.${fmt(discount)}`);
   }
 
-  y = Math.max(leftBottomY, sumY) + 8;
+  y += 6;
 
-  // ========== TOTAL BOX (full width) ==========
-  const totalBoxH = 26;
-  doc.save().roundedRect(MARGIN, y, CONTENT_WIDTH, totalBoxH, 4).fill(DARK).restore();
+  // ─────────────────────────────────────────────────────────────────────────
+  // TOTAL BOX
+  // ─────────────────────────────────────────────────────────────────────────
+  const TOTAL_H = 26;
+  filledRect(doc, MARGIN, y, CONTENT_W, TOTAL_H, 4, DARK);
 
-  doc.font("Helvetica-Bold").fontSize(10).fillColor(WHITE);
-  doc.text("TOTAL", MARGIN + 10, y + 8, { width: CONTENT_WIDTH * 0.3, characterSpacing: 0.5 });
-
-  // vertical divider "|"
-  const dividerX = MARGIN + CONTENT_WIDTH * 0.38;
-  doc.save().strokeColor("#5a6b8c").lineWidth(1)
-    .moveTo(dividerX, y + 6).lineTo(dividerX, y + totalBoxH - 6).stroke().restore();
-
-  doc.font("Helvetica-Bold").fontSize(13).fillColor(WHITE);
-  doc.text(`Rs.${fmt(totalAmount)}`, dividerX + 10, y + 6, {
-    width: CONTENT_WIDTH - (dividerX - MARGIN) - 18,
-    align: "right",
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(WHITE);
+  doc.text("TOTAL", MARGIN + 10, y + 9, {
+    width: CONTENT_W * 0.36,
+    lineBreak: false,
+    characterSpacing: 1,
   });
-  y += totalBoxH + 12;
 
-  // ========== FOOTER ==========
-  const dotR = 1.5;
-  const footerText = "THANK YOU. VISIT AGAIN.";
+  // Vertical divider
+  const divX = MARGIN + Math.round(CONTENT_W * 0.44);
+  doc.save()
+    .strokeColor("#4a6299").lineWidth(0.8)
+    .moveTo(divX, y + 5).lineTo(divX, y + TOTAL_H - 5)
+    .stroke().restore();
+
+  // Total amount (auto-fit font size so Rs.1,00,000.00 still fits)
+  const totalStr = `Rs.${fmt(totalAmount)}`;
+  const totalAvailW = CONTENT_W - (divX - MARGIN) - 14;
+  let totalFontSize = 13;
+  doc.font("Helvetica-Bold").fontSize(totalFontSize);
+  while (doc.widthOfString(totalStr) > totalAvailW && totalFontSize > 9) {
+    totalFontSize -= 1;
+    doc.fontSize(totalFontSize);
+  }
+  doc.fillColor(WHITE);
+  doc.text(totalStr, divX + 8, y + (TOTAL_H - totalFontSize) / 2 + 1, {
+    width: totalAvailW,
+    align: "right",
+    lineBreak: false,
+  });
+
+  y += TOTAL_H + 14;
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FOOTER
+  // ─────────────────────────────────────────────────────────────────────────
+  const tyText = "THANK YOU  *  VISIT AGAIN";
   doc.font("Helvetica-Bold").fontSize(7).fillColor(MUTED);
-  const footerW = doc.widthOfString(footerText, { characterSpacing: 1 });
-  const footerTextX = (PAGE_WIDTH_PT - footerW) / 2;
-  const lineGap = 14;
+  const tyW = doc.widthOfString(tyText, { characterSpacing: 0.8 });
+  const tyX = (PAGE_WIDTH_PT - tyW) / 2;
 
-  doc.save().fillColor(MUTED)
-    .circle(footerTextX - lineGap - dotR, y + 3, dotR).fill()
-    .circle(footerTextX + footerW + lineGap + dotR, y + 3, dotR).fill()
-    .restore();
-  drawDashedLine(doc, y + 3, MARGIN, footerTextX - lineGap - 6);
-  drawDashedLine(doc, y + 3, footerTextX + footerW + lineGap + 6, PAGE_WIDTH_PT - MARGIN);
+  const dashGap = 8;
+  const lineY = y + 3.5;
+  const leftEnd   = Math.max(MARGIN, tyX - dashGap);
+  const rightStart = Math.min(PAGE_WIDTH_PT - MARGIN, tyX + tyW + dashGap);
+  if (leftEnd > MARGIN) {
+    dashedLine(doc, lineY, MARGIN, leftEnd, BORDER);
+  }
+  if (rightStart < PAGE_WIDTH_PT - MARGIN) {
+    dashedLine(doc, lineY, rightStart, PAGE_WIDTH_PT - MARGIN, BORDER);
+  }
+  doc.text(tyText, tyX, y, { lineBreak: false, characterSpacing: 0.8 });
+  y += 14;
 
-  doc.text(footerText, footerTextX, y, { lineBreak: false, characterSpacing: 1 });
-  y += 18;
+  // Powered-by watermark
+  doc.font("Helvetica").fontSize(6).fillColor("#c0cad8");
+  doc.text("Powered by Billora", MARGIN, y, {
+    width: CONTENT_W,
+    align: "center",
+    lineBreak: false,
+  });
+  y += 10;
 
-  // Adjust page height to content
+  // ─────────────────────────────────────────────────────────────────────────
+  // Trim page to content
+  // ─────────────────────────────────────────────────────────────────────────
   doc.page.height = y + MARGIN;
 }
 
