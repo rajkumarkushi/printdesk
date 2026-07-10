@@ -238,14 +238,14 @@ function AdminDashboard() {
           <div className="d-flex align-items-center gap-3">
             <div
               className="d-flex align-items-center justify-content-center logo-wrap"
-              style={{ width: 44, height: 44, borderRadius: 12 }}
+              style={{ width: 52, height: 52, borderRadius: 14 }}
             >
               <img
                 src={billoraLogo}
                 alt="Billora Logo"
                 style={{
-                  width: "40px",
-                  height: "40px",
+                  width: "46px",
+                  height: "46px",
                   objectFit: "contain",
                 }}
               />

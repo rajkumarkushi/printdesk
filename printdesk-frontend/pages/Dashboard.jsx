@@ -182,14 +182,14 @@ function Dashboard() {
           <div className="d-flex align-items-center gap-3">
             <div
               className="d-flex align-items-center justify-content-center logo-wrap"
-              style={{ width: 44, height: 44, borderRadius: 12 }}
+              style={{ width: 52, height: 52, borderRadius: 14 }}
             >
               <img
                 src={billoraLogo}
                 alt="Billora Logo"
                 style={{
-                  width: "40px",
-                  height: "40px",
+                  width: "46px",
+                  height: "46px",
                   objectFit: "contain",
                 }}
               />
@@ -313,22 +313,50 @@ function Dashboard() {
         <div className="modern-card table-card bg-white">
           <div className="p-4 border-bottom">
             <h5 className="fw-bold mb-3">Invoices</h5>
-            <div className="d-flex flex-wrap gap-3 align-items-end">
-              <div className="flex-grow-1" style={{ minWidth: 200 }}>
+            <div className="d-flex flex-wrap gap-3 align-items-end justify-content-center">
+              <div style={{ width: 280 }}>
                 <label className="form-label small text-soft">Search</label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Customer, phone or invoice no..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      setPage(1);
-                      fetchInvoices(1, searchTerm, statusFilter, startDate, endDate);
-                    }
-                  }}
-                />
+                <div className="position-relative">
+                  <input
+                    type="text"
+                    className="form-control"
+                    style={{ paddingRight: searchTerm ? 32 : 12 }}
+                    placeholder="Customer, phone or invoice no..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setPage(1);
+                        fetchInvoices(1, searchTerm, statusFilter, startDate, endDate);
+                      }
+                    }}
+                  />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      className="position-absolute d-flex align-items-center justify-content-center"
+                      style={{
+                        right: 10,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        color: "var(--muted)",
+                        fontSize: "1rem",
+                        cursor: "pointer",
+                        lineHeight: 1,
+                      }}
+                      onClick={() => {
+                        setSearchTerm("");
+                        setPage(1);
+                        fetchInvoices(1, "", statusFilter, startDate, endDate);
+                      }}
+                    >
+                      &#10005;
+                    </button>
+                  )}
+                </div>
               </div>
               <div style={{ minWidth: 120 }}>
                 <label className="form-label small text-soft">Status</label>

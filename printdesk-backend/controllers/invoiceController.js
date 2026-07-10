@@ -3,6 +3,7 @@ const path = require("path");
 const Invoice = require("../models/Invoice");
 const PDFDocument = require("pdfkit");
 const QRCode = require("qrcode");
+const { generateInvoicePdf, PAGE_WIDTH_PT } = require("../utils/invoicePdfTemplate");
 
 // ===============================
 // COMMON CALCULATION FUNCTION
@@ -296,8 +297,8 @@ exports.downloadInvoice = async (req, res) => {
     const business = req.user;
 
     const doc = new PDFDocument({
-      size: [226, 700],
-      margin: 15,
+      size: [PAGE_WIDTH_PT, 600],
+      margin: 0,
     });
 
     res.setHeader(
@@ -308,124 +309,7 @@ exports.downloadInvoice = async (req, res) => {
 
     doc.pipe(res);
 
-    const logoPath = path.join(__dirname, "../assets/billora.png");
-
-    if (fs.existsSync(logoPath)) {
-      doc.opacity(0.2);
-      doc.image(logoPath, 38, 180, {
-        width: 150,
-      });
-      doc.opacity(1);
-    }
-
-    let y = 20;
-
-    const line = () => {
-      doc.moveTo(15, y).lineTo(211, y).stroke();
-      y += 12;
-    };
-
-    doc.font("Helvetica-Bold").fontSize(18).text("BILLORA", {
-      align: "center",
-    });
-
-    y += 30;
-
-    doc.font("Helvetica").fontSize(10);
-    doc.text(`Invoice #${invoice.invoiceNumber}`, 15, y);
-    y += 14;
-    doc.text(new Date(invoice.createdAt).toLocaleDateString(), 15, y);
-
-    y += 20;
-    doc.text(invoice.customerName || "-", 15, y);
-    y += 14;
-    doc.text(invoice.customerPhone || "-", 15, y);
-
-    y += 20;
-    line();
-
-    doc.font("Helvetica-Bold");
-    doc.text("Item", 15, y);
-    doc.text("Qty", 120, y);
-    doc.text("Amount", 160, y);
-
-    y += 15;
-    line();
-
-    let subtotal = 0;
-
-    invoice.items.forEach((item) => {
-      const itemTotal = Number(item.quantity) * Number(item.price);
-      subtotal += itemTotal;
-
-      doc.font("Helvetica").fontSize(10);
-      doc.text(item.itemType || "-", 15, y, { width: 90 });
-      doc.text(String(item.quantity), 125, y);
-      doc.text(`Rs. ${itemTotal}`, 160, y);
-
-      y += 18;
-    });
-
-    y += 5;
-    line();
-
-    const gstPercent = Number(invoice.gstPercent) || 0;
-    const gstAmount = Number(invoice.gstAmount) || 0;
-    const discount = Number(invoice.discount) || 0;
-    const totalAmount = Number(invoice.totalAmount) || 0;
-
-    doc.font("Helvetica").fontSize(10);
-
-    doc.text("Subtotal", 15, y);
-    doc.text(`Rs. ${subtotal}`, 155, y);
-
-    y += 15;
-
-    doc.text(`GST (${gstPercent}%)`, 15, y);
-    doc.text(`Rs. ${gstAmount}`, 155, y);
-
-    y += 15;
-
-    doc.text("Discount", 15, y);
-    doc.text(`Rs. ${discount}`, 155, y);
-
-    y += 18;
-    line();
-
-    doc.font("Helvetica-Bold").fontSize(14);
-    doc.text("TOTAL", 15, y);
-    doc.text(`Rs. ${totalAmount}`, 145, y);
-
-    y += 30;
-
-    const upiId = "yourupi@oksbi";
-    const payeeName = business.businessName || "Billora";
-    const amount = totalAmount.toFixed(2);
-
-    const upiLink =
-      `upi://pay?pa=${encodeURIComponent(upiId)}` +
-      `&pn=${encodeURIComponent(payeeName)}` +
-      `&am=${amount}` +
-      `&cu=INR`;
-
-    const qrImage = await QRCode.toDataURL(upiLink);
-
-    const qrSize = 90;
-    const qrX = doc.page.width - qrSize - 15;
-
-    doc.image(qrImage, qrX, y + 30, {
-      width: qrSize,
-      height: qrSize,
-    });
-
-    y += 140;
-    line();
-
-    doc.font("Helvetica-Bold").fontSize(12);
-    doc.text("Thank you!", 0, y, {
-      align: "center",
-      width: doc.page.width,
-    });
+    await generateInvoicePdf(doc, invoice, business);
 
     doc.end();
   } catch (error) {
