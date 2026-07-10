@@ -7,6 +7,7 @@
 // router.post("/login", login);
 
 // module.exports = router; 
+const express = require("express");
 const multer = require("multer");
 const path = require("path");
 const { register, login, registerLogo } = require("../controllers/authController");
