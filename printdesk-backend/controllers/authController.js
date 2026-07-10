@@ -14,7 +14,7 @@ exports.register = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    await Business.create({
+    const business = await Business.create({
       businessName,
       ownerName,
       email,
@@ -24,8 +24,27 @@ exports.register = async (req, res) => {
       gstNumber: gstNumber || "",
     });
 
-    res.status(201).json({ message: "Registered successfully" });
+    res.status(201).json({ message: "Registered successfully", id: business._id });
 
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// REGISTER LOGO (Wizard)
+exports.registerLogo = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No logo file uploaded" });
+    }
+    const business = await Business.findById(req.params.id);
+    if (!business) {
+      return res.status(404).json({ message: "Business not found" });
+    }
+    const relativePath = `/uploads/logos/${req.file.filename}`;
+    business.logoUrl = relativePath;
+    await business.save();
+    res.json({ message: "Logo uploaded successfully", logoUrl: relativePath });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

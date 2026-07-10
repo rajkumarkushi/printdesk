@@ -22,9 +22,9 @@ function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await API.post("/auth/register", form);
-      alert("Registered Successfully");
-      navigate("/login");
+      const res = await API.post("/auth/register", form);
+      const id = res.data.id;
+      navigate(`/upload-logo/${id}`);
     } catch (err) {
       alert(err.response?.data?.message || "Error");
     }

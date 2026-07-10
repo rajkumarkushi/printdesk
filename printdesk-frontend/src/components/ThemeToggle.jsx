@@ -10,6 +10,7 @@ function ThemeToggle() {
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const effective = mode === "system" ? (prefersDark ? "dark" : "light") : mode;
     document.documentElement.setAttribute("data-theme", effective);
+    document.documentElement.setAttribute("data-bs-theme", effective);
   };
 
   useEffect(() => {

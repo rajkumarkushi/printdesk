@@ -764,3 +764,47 @@ footer {
 .filter-bar .btn-check:checked + .btn {
   box-shadow: 0 2px 8px rgba(79, 70, 229, 0.2);
 }
+
+/* ======================================================
+   Dark Mode Auth Overrides for visibility and contrast
+   ====================================================== */
+
+[data-theme="dark"] .auth-page {
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(129, 140, 248, 0.08), transparent 50%),
+    radial-gradient(ellipse at 80% 0%, rgba(34, 211, 238, 0.05), transparent 50%),
+    var(--page) !important;
+}
+
+[data-theme="dark"] .auth-card {
+  background: var(--panel) !important;
+  border-color: var(--line) !important;
+  color: var(--ink) !important;
+}
+
+[data-theme="dark"] .auth-card label {
+  color: var(--muted) !important;
+}
+
+[data-theme="dark"] .auth-card p {
+  color: var(--muted) !important;
+}
+
+[data-theme="dark"] .auth-card .form-control {
+  background-color: rgba(15, 23, 42, 0.6) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+}
+
+[data-theme="dark"] .auth-card .form-control:focus {
+  background-color: rgba(15, 23, 42, 0.8) !important;
+  color: var(--ink) !important;
+  border-color: var(--brand) !important;
+}
+
+[data-theme="dark"] .auth-card .form-floating > .form-control:focus ~ label,
+[data-theme="dark"] .auth-card .form-floating > .form-control:not(:placeholder-shown) ~ label {
+  color: var(--brand-dark) !important;
+  filter: brightness(1.2);
+}
+

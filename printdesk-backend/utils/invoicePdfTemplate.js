@@ -115,7 +115,7 @@ async function generateInvoicePdf(doc, invoice, business) {
 
   // Logo
   const logoPath = business.logoUrl
-    ? path.join(__dirname, "../uploads", path.basename(business.logoUrl))
+    ? path.join(__dirname, "../uploads/logos", path.basename(business.logoUrl))
     : null;
   if (logoPath && fs.existsSync(logoPath)) {
     const logoSize = 34;

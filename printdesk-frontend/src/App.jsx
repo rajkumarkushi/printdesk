@@ -7,6 +7,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import Landing from "../pages/Landing";
 import EditInvoice from "../pages/EditInvoice";
 import AdminDashboard from "../pages/AdminDashboard";
+import UploadLogo from "../pages/UploadLogo";
 
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/upload-logo/:id" element={<UploadLogo />} />
         <Route path="/admin-dashboard" element={<AdminDashboard />} />
 
         <Route
