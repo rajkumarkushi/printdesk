@@ -9,6 +9,9 @@ function Register() {
     ownerName: "",
     email: "",
     password: "",
+    phone: "",
+    address: "",
+    gstNumber: "",
   });
   const navigate = useNavigate();
 
@@ -59,9 +62,21 @@ function Register() {
             <input type="email" name="email" className="form-control" id="floatingEmail" placeholder="name@example.com" onChange={handleChange} required />
             <label htmlFor="floatingEmail">Email address</label>
           </div>
-          <div className="form-floating mb-4">
+          <div className="form-floating mb-3">
             <input type="password" name="password" className="form-control" id="floatingPassword" placeholder="Password" onChange={handleChange} required />
             <label htmlFor="floatingPassword">Password</label>
+          </div>
+          <div className="form-floating mb-3">
+            <input type="tel" name="phone" className="form-control" id="floatingPhone" placeholder="Phone Number" onChange={handleChange} />
+            <label htmlFor="floatingPhone">Phone Number</label>
+          </div>
+          <div className="form-floating mb-3">
+            <input type="text" name="address" className="form-control" id="floatingAddress" placeholder="Business Address" onChange={handleChange} />
+            <label htmlFor="floatingAddress">Business Address</label>
+          </div>
+          <div className="form-floating mb-4">
+            <input type="text" name="gstNumber" className="form-control" id="floatingGst" placeholder="GSTIN" onChange={handleChange} />
+            <label htmlFor="floatingGst">GSTIN (optional)</label>
           </div>
           <button className="btn btn-primary w-100 mb-3 py-2">Create Account</button>
         </form>
