@@ -25,10 +25,11 @@ function CreateInvoice() {
   );
 
   const gstAmount = Math.round((subtotal * Number(gstPercent)) / 100);
+  const discountAmount = Math.round((subtotal * Number(discount || 0)) / 100);
 
   const totalAmount = Math.max(
     0,
-    subtotal + gstAmount - Number(discount || 0)
+    subtotal + gstAmount - discountAmount
   );
 
   const handleSubmit = async (e) => {
@@ -181,11 +182,11 @@ function CreateInvoice() {
                 </select>
               </div>
               <div className="col-md-6">
-                <label className="form-label">Discount</label>
+                <label className="form-label">Discount (%)</label>
                 <input
                   type="number"
                   className="form-control"
-                  placeholder="0"
+                  placeholder="e.g. 5"
                   value={discount}
                   onChange={(e) => setDiscount(Number(e.target.value))}
                 />
@@ -208,10 +209,12 @@ function CreateInvoice() {
                 <span className="text-soft">GST ({gstPercent}%)</span>
                 <span className="fw-semibold">&#8377;{gstAmount.toLocaleString("en-IN")}</span>
               </div>
-              <div className="d-flex justify-content-between mb-3">
-                <span className="text-soft">Discount</span>
-                <span className="fw-semibold">&#8377;{Number(discount || 0).toLocaleString("en-IN")}</span>
-              </div>
+              {discount > 0 && (
+                <div className="d-flex justify-content-between mb-3">
+                  <span className="text-soft">Discount ({discount}%)</span>
+                  <span className="fw-semibold">&#8377;{discountAmount.toLocaleString("en-IN")}</span>
+                </div>
+              )}
               <div
                 className="d-flex justify-content-between pt-3"
                 style={{ borderTop: "2px solid var(--line)" }}

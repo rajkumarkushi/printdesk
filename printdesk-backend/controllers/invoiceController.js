@@ -26,11 +26,12 @@ const calculateInvoiceTotals = (items, gstPercentInput, discountInput) => {
 
   const requestedDiscount = Number(discountInput);
   const discount =
-    Number.isFinite(requestedDiscount) && requestedDiscount > 0
-      ? Math.min(requestedDiscount, subtotal + gstAmount)
+    Number.isFinite(requestedDiscount) && requestedDiscount >= 0
+      ? Math.min(requestedDiscount, 100)
       : 0;
 
-  const totalAmount = Math.max(0, subtotal + gstAmount - discount);
+  const discountAmount = Math.round((subtotal * discount) / 100);
+  const totalAmount = Math.max(0, subtotal + gstAmount - discountAmount);
 
   return {
     subtotal,
