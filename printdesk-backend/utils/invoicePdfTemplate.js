@@ -96,9 +96,9 @@ function iconClock(doc, x, y, s, c) {
 // Shift columns left so RATE and AMOUNT have enough room for numbers like 9,000.00
 const COL = {
   itemX: MARGIN + 6,
-  qtyX:  MARGIN + Math.round(CONTENT_W * 0.44),
-  rateX: MARGIN + Math.round(CONTENT_W * 0.55),
-  amtX:  MARGIN + Math.round(CONTENT_W * 0.74),
+  qtyX:  MARGIN + Math.round(CONTENT_W * 0.35),
+  rateX: MARGIN + Math.round(CONTENT_W * 0.45),
+  amtX:  MARGIN + Math.round(CONTENT_W * 0.72),
 };
 COL.itemW = COL.qtyX  - COL.itemX - 4;
 COL.qtyW  = COL.rateX - COL.qtyX  - 4;

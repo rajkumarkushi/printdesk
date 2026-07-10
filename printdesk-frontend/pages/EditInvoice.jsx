@@ -49,7 +49,7 @@ function EditInvoice() {
 
   const totalAmount = Math.max(
     0,
-    subtotal - gstAmount - Number(discount || 0)
+    subtotal + gstAmount - Number(discount || 0)
   );
 
   const handleSubmit = async (e) => {
