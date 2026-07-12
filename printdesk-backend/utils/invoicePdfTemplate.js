@@ -373,10 +373,11 @@ async function generateInvoicePdf(doc, invoice, business) {
   // ─────────────────────────────────────────────────────────────────────────
   const gstPercent  = Number(invoice.gstPercent) || 0;
   const gstAmount   = Number(invoice.gstAmount)  || 0;
-  const discount    = Number(invoice.discount)   || 0;
+  const discountPercent = Number(invoice.discount) || 0;
+  const discountAmount  = Math.round((subtotal * discountPercent) / 100);
   const totalAmount = typeof invoice.totalAmount === "number" && !isNaN(invoice.totalAmount)
     ? invoice.totalAmount
-    : subtotal + gstAmount - discount;
+    : subtotal + gstAmount - discountAmount;
   const halfGst = gstAmount / 2;
 
   // Label occupies the right 60% of content; value is right-aligned inside last 30%
@@ -403,8 +404,8 @@ async function generateInvoicePdf(doc, invoice, business) {
   }
 
   // Discount row only if discount > 0
-  if (discount > 0) {
-    summaryRow("DISCOUNT", `-Rs.${fmt(discount)}`);
+  if (discountPercent > 0) {
+    summaryRow(`DISCOUNT (${discountPercent}%)`, `-Rs.${fmt(discountAmount)}`);
   }
 
   y += 6;
