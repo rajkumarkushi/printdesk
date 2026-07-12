@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 function BusinessProfile() {
   const [businessName, setBusinessName] = useState("");
+  const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [gstNumber, setGstNumber] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
@@ -15,6 +16,7 @@ function BusinessProfile() {
       try {
         const res = await API.get("/business/profile");
         setBusinessName(res.data.businessName || "");
+        setPhone(res.data.phone || "");
         setAddress(res.data.address || "");
         setGstNumber(res.data.gstNumber || "");
         setLogoUrl(res.data.logoUrl || "");
@@ -32,6 +34,7 @@ function BusinessProfile() {
     try {
       await API.put("/business/profile", {
         businessName,
+        phone,
         address,
         gstNumber,
       });
@@ -97,6 +100,16 @@ function BusinessProfile() {
             value={businessName}
             onChange={(e) => setBusinessName(e.target.value)}
           />
+
+          <input
+            className="form-control mb-3"
+            placeholder="Phone Number (Indian, 10 digits)"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+          <small className="text-muted d-block mb-3" style={{ marginTop: "-8px" }}>
+            Required for online payments via Razorpay
+          </small>
 
           <textarea
             className="form-control mb-3"

@@ -11,6 +11,11 @@ const {
   downloadUserInvoicePdf,
   downloadUserSummaryPdf,
   markInvoicePaid,
+  getAllPayments,
+  getUserPayments,
+  downloadUserPaymentsPdf,
+  downloadSinglePaymentPdf,
+  downloadAllPaymentsPdf,
 } = require("../controllers/adminController");
 
 const router = express.Router();
@@ -37,5 +42,10 @@ router.put(
   adminOnly,
   markInvoicePaid
 );
+router.get("/payments", protect, adminOnly, getAllPayments);
+router.get("/payments-all-pdf", protect, adminOnly, downloadAllPaymentsPdf);
+router.get("/payments/:paymentId/pdf", protect, adminOnly, downloadSinglePaymentPdf);
+router.get("/users/:id/payments", protect, adminOnly, getUserPayments);
+router.get("/users/:id/payments-pdf", protect, adminOnly, downloadUserPaymentsPdf);
 
 module.exports = router;

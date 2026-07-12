@@ -334,7 +334,12 @@ exports.markInvoicePaid = async (req, res) => {
       return res.status(404).json({ message: "Invoice not found" });
     }
 
-    invoice.status = "paid";
+    const { paymentMode } = req.body;
+    invoice.status = "Paid";
+    invoice.paidAt = new Date();
+    if (paymentMode) {
+      invoice.paymentMode = paymentMode;
+    }
     await invoice.save();
 
     res.json({ message: "Invoice marked as paid", invoice });

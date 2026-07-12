@@ -151,17 +151,119 @@ function Dashboard() {
           }
         },
         prefill: {
-          name: profile?.businessName || "",
-          email: profile?.email || "",
-          contact: profile?.phone || "",
+          name: profile?.businessName || "Billora User",
+          email: profile?.email || "test@billora.com",
+          contact: profile?.phone || "9876543210",
+          country: "IN",
+        },
+        config: {
+          display: {
+            blocks: {
+              utib: {
+                name: "Pay using UPI",
+                instruments: [
+                  { method: "upi" },
+                ],
+              },
+            },
+            sequence: ["block.utib"],
+            preferences: {
+              show_default_blocks: true,
+            },
+          },
+          readonly: {
+            contact: true,
+            email: true,
+            name: true,
+          },
         },
         theme: {
           color: "#4f46e5",
         },
         modal: {
-          ondismiss: () => {
-            // Payment cancelled by user
+          ondismiss: () => {},
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (error) {
+      alert(error.response?.data?.message || "Failed to initiate payment");
+    }
+  };
+
+  const getValidPhone = () => {
+    if (!profile?.phone) return "";
+    const cleaned = profile.phone.replace(/[\s\-()]/g, "");
+    if (/^[6-9]\d{9}$/.test(cleaned)) return cleaned;
+    if (/^91[6-9]\d{9}$/.test(cleaned)) return cleaned;
+    if (/^\+91[6-9]\d{9}$/.test(cleaned)) return cleaned;
+    return "";
+  };
+
+  const openRazorpayInvoiceCheckout = async (invoiceId) => {
+    try {
+      if (typeof window.Razorpay === "undefined") {
+        alert("Payment system is loading. Please try again in a moment.");
+        return;
+      }
+
+      const { data: orderData } = await API.post("/payments/create-invoice-order", { invoiceId });
+
+      const options = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "Billora",
+        description: `Pay Invoice ${orderData.invoiceNumber}`,
+        order_id: orderData.orderId,
+        handler: async (response) => {
+          try {
+            const { data } = await API.post("/payments/verify-invoice-payment", {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              invoiceId,
+            });
+            alert(data.message);
+            fetchInvoices(page);
+            fetchUsage();
+          } catch (error) {
+            alert(error.response?.data?.message || "Payment verification failed");
+          }
+        },
+        prefill: {
+          name: profile?.businessName || "Billora User",
+          email: profile?.email || "test@billora.com",
+          contact: profile?.phone || "9876543210",
+          country: "IN",
+        },
+        config: {
+          display: {
+            blocks: {
+              utib: {
+                name: "Pay using UPI",
+                instruments: [
+                  { method: "upi" },
+                ],
+              },
+            },
+            sequence: ["block.utib"],
+            preferences: {
+              show_default_blocks: true,
+            },
           },
+          readonly: {
+            contact: true,
+            email: true,
+            name: true,
+          },
+        },
+        theme: {
+          color: "#4f46e5",
+        },
+        modal: {
+          ondismiss: () => {},
         },
       };
 
@@ -219,6 +321,12 @@ function Dashboard() {
               }} />
               {profile?.businessName || "Business"}
             </div>
+            <button
+              className="btn btn-outline-primary btn-sm"
+              onClick={() => navigate("/payment-history")}
+            >
+              Payments
+            </button>
             <ThemeToggle />
             <button
               className="btn btn-outline-secondary btn-sm"
@@ -240,9 +348,8 @@ function Dashboard() {
             <p className="text-soft mb-0">Track billing activity, usage, and invoices from one place.</p>
           </div>
           <button
-            className="btn btn-primary"
+            className="btn btn-primary px-4 py-2"
             onClick={() => navigate("/create-invoice")}
-            style={{ paddingLeft: 20, paddingRight: 20, paddingTop: 10, paddingBottom: 10 }}
           >
             + Create Invoice
           </button>
@@ -311,10 +418,10 @@ function Dashboard() {
         </div>
 
         <div className="modern-card table-card bg-white">
-          <div className="p-4 border-bottom">
-            <h5 className="fw-bold mb-3">Invoices</h5>
+          <div className="px-4 pt-4 pb-3 border-bottom">
+            <h5 className="fw-bold mb-2">Invoices</h5>
             <div className="d-flex flex-wrap gap-3 align-items-end justify-content-center">
-              <div style={{ width: 280 }}>
+              <div style={{ maxWidth: 280, width: "100%" }}>
                 <label className="form-label small text-soft">Search</label>
                 <div className="position-relative">
                   <input
@@ -452,6 +559,15 @@ function Dashboard() {
                     </td>
                     <td>
                       <div className="d-flex flex-wrap gap-2 justify-content-end">
+                        {inv.status !== "Paid" && (
+                          <button
+                            className="btn btn-sm btn-success"
+                            onClick={() => openRazorpayInvoiceCheckout(inv._id)}
+                            title="Pay Online via Razorpay"
+                          >
+                            &#128176; Pay
+                          </button>
+                        )}
                         <button
                           className="btn btn-sm btn-outline-success"
                           onClick={() => handleDownload(inv._id)}

@@ -8,6 +8,7 @@ import Landing from "../pages/Landing";
 import EditInvoice from "../pages/EditInvoice";
 import AdminDashboard from "../pages/AdminDashboard";
 import UploadLogo from "../pages/UploadLogo";
+import PaymentHistory from "../pages/PaymentHistory";
 
 
 function App() {
@@ -19,6 +20,15 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/upload-logo/:id" element={<UploadLogo />} />
         <Route path="/admin-dashboard" element={<AdminDashboard />} />
+
+        <Route
+          path="/payment-history"
+          element={
+            <ProtectedRoute>
+              <PaymentHistory />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/dashboard"

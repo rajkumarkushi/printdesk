@@ -546,7 +546,7 @@ body {
 }
 
 .dashboard-header {
-  padding: 28px 0;
+  padding: 32px 0 24px;
 }
 
 .table-card {
@@ -596,12 +596,26 @@ body {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  padding: 0.35rem 0.85rem;
+  padding: 4px 12px;
   font-weight: 700;
   font-size: 0.78rem;
   color: var(--brand);
   background: rgba(79, 70, 229, 0.08);
   letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.badge-type-invoice {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: #fff;
+  background: #0dcaf0;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 .invoice-page {
@@ -648,7 +662,7 @@ body {
 
 .modal-footer {
   border-top: 1px solid var(--line);
-  padding: 16px 24px;
+  padding: 20px 24px;
 }
 
 footer {
@@ -706,21 +720,29 @@ footer {
 }
 
 .invoice-status-paid {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--success);
   background: rgba(16, 185, 129, 0.08);
   border-radius: 999px;
-  padding: 3px 10px;
+  padding: 4px 12px;
   font-size: 0.78rem;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .invoice-status-unpaid {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--danger);
   background: rgba(239, 68, 68, 0.08);
   border-radius: 999px;
-  padding: 3px 10px;
+  padding: 4px 12px;
   font-size: 0.78rem;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .empty-state {

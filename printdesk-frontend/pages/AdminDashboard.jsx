@@ -28,8 +28,60 @@ function AdminDashboard() {
   const [usersTotal, setUsersTotal] = useState(0);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [paymentsModalOpen, setPaymentsModalOpen] = useState(false);
+  const [payments, setPayments] = useState([]);
+  const [paymentsPage, setPaymentsPage] = useState(1);
+  const [paymentsTotalPages, setPaymentsTotalPages] = useState(1);
+  const [paymentsTotal, setPaymentsTotal] = useState(0);
+  const [paymentsTypeFilter, setPaymentsTypeFilter] = useState("all");
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsUserFilter, setPaymentsUserFilter] = useState(null);
+  const [paymentsFadeKey, setPaymentsFadeKey] = useState(0);
 
   const navigate = useNavigate();
+
+  const fetchPayments = async (page = 1, type = "all", userId = null) => {
+    setPaymentsLoading(true);
+    const params = new URLSearchParams({ page, limit: 10 });
+    if (type && type !== "all") params.append("type", type);
+    if (userId) params.append("userId", userId);
+    try {
+      const url = userId
+        ? `/admin/users/${userId}/payments?${params.toString()}`
+        : `/admin/payments?${params.toString()}`;
+      const { data } = await API.get(url);
+      setPayments(data.payments);
+      setPaymentsTotalPages(data.totalPages);
+      setPaymentsTotal(data.total);
+    } catch (error) {
+      console.error("Failed to fetch payments", error);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  };
+
+  const openAllPaymentsModal = () => {
+    setPaymentsUserFilter(null);
+    setPaymentsTypeFilter("all");
+    setPaymentsPage(1);
+    setPaymentsModalOpen(true);
+    fetchPayments(1, "all", null);
+  };
+
+  const openUserPaymentsModal = (user) => {
+    setPaymentsUserFilter(user._id);
+    setPaymentsTypeFilter("all");
+    setPaymentsPage(1);
+    setPaymentsModalOpen(true);
+    fetchPayments(1, "all", user._id);
+  };
+
+  const closePaymentsModal = () => {
+    setPaymentsModalOpen(false);
+    setPayments([]);
+    setPaymentsUserFilter(null);
+    setPaymentsPage(1);
+  };
 
   const fetchStats = async () => {
     const res = await API.get("/admin/stats");
@@ -228,6 +280,45 @@ function AdminDashboard() {
     }
   };
 
+  const handleDownloadPaymentsPdf = async () => {
+    try {
+      const url = paymentsUserFilter
+        ? `/admin/users/${paymentsUserFilter}/payments-pdf`
+        : `/admin/payments-all-pdf`;
+      const response = await API.get(url, { responseType: "blob" });
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.setAttribute(
+        "download",
+        paymentsUserFilter
+          ? `payments-${paymentsUserFilter}.pdf`
+          : `all-payments.pdf`
+      );
+      document.body.appendChild(link);
+      link.click();
+    } catch (error) {
+      alert("Failed to download payments PDF");
+    }
+  };
+
+  const handleDownloadSinglePaymentPdf = async (paymentId) => {
+    try {
+      const response = await API.get(
+        `/admin/payments/${paymentId}/pdf`,
+        { responseType: "blob" }
+      );
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `payment-${paymentId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+    } catch (error) {
+      alert("Failed to download payment receipt");
+    }
+  };
+
   const filteredUsers = users;
 
   return (
@@ -258,6 +349,12 @@ function AdminDashboard() {
             </div>
           </div>
           <div className="d-flex align-items-center gap-3">
+            <button
+              className="btn btn-outline-primary btn-sm"
+              onClick={openAllPaymentsModal}
+            >
+              All Payments
+            </button>
             <ThemeToggle />
             <button
               className="btn btn-outline-secondary btn-sm"
@@ -305,7 +402,7 @@ function AdminDashboard() {
         </div>
 
         {/* Filters + Search */}
-        <div className="filter-bar p-3 mb-4">
+        <div className="filter-bar px-4 py-3 mb-4">
           <div className="d-flex flex-wrap gap-3 align-items-center justify-content-between">
             <div className="d-flex flex-wrap gap-2">
               {[
@@ -506,12 +603,6 @@ function AdminDashboard() {
                       <td>
                         <div className="d-flex flex-wrap gap-2 justify-content-end">
                           <button
-                            className="btn btn-sm btn-outline-success"
-                            onClick={() => handleDownloadUserSummaryPdf(user)}
-                          >
-                            PDF
-                          </button>
-                          <button
                             className="btn btn-sm btn-outline-secondary"
                             onClick={() => openEditUser(user)}
                           >
@@ -522,6 +613,12 @@ function AdminDashboard() {
                             onClick={() => openInvoicesModal(user)}
                           >
                             Invoices
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-info"
+                            onClick={() => openUserPaymentsModal(user)}
+                          >
+                            Payments
                           </button>
                           <button
                             className="btn btn-sm btn-outline-danger"
@@ -593,7 +690,7 @@ function AdminDashboard() {
             onClick={(e) => e.stopPropagation()}
           >
             <div
-              className="d-flex justify-content-between align-items-center p-4 border-bottom"
+              className="modal-header"
             >
               <h5 className="fw-bold mb-0">Edit User</h5>
               <button
@@ -648,7 +745,7 @@ function AdminDashboard() {
                 />
               </div>
             </div>
-            <div className="d-flex justify-content-end gap-2 p-4 border-top">
+            <div className="modal-footer d-flex justify-content-end gap-2">
               <button
                 type="button"
                 className="btn btn-outline-secondary"
@@ -686,13 +783,8 @@ function AdminDashboard() {
                     {invoiceModalUser.businessName} &mdash; {invoiceModalUser.email}
                   </small>
                 </div>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={closeInvoicesModal}
-                />
               </div>
-              <div className="modal-body" style={{ overflowY: "auto", flex: "1 1 auto" }}>
+              <div className="modal-body p-4" style={{ overflowY: "auto", flex: "1 1 auto" }}>
                 {invoiceModalLoading ? (
                   <div className="text-center py-4 text-soft">
                     <span
@@ -800,11 +892,225 @@ function AdminDashboard() {
         </div>
       )}
 
-      {/* CSS for loading spinner */}
+      {/* Payments Modal */}
+      {paymentsModalOpen && (
+        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ zIndex: 1050 }}>
+          <div
+            className="position-absolute top-0 start-0 w-100 h-100"
+            style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+            onClick={closePaymentsModal}
+          />
+          <div className="modal-dialog modal-lg" role="document" style={{ zIndex: 1051, position: "relative", margin: "1rem" }}>
+            <div className="modal-content" style={{ borderRadius: "var(--radius-lg)", maxHeight: "90vh", display: "flex", flexDirection: "column", background: "var(--panel)" }}>
+              <div className="modal-header" style={{ flexShrink: 0 }}>
+                <div>
+                  <h5 className="modal-title fw-bold">Payment History</h5>
+                  <small className="text-soft d-block">
+                    {paymentsUserFilter ? "User payments" : "All payments across users"}
+                  </small>
+                </div>
+              </div>
+              <div className="modal-body p-4" style={{ overflowY: "auto", flex: "1 1 auto", padding: "1.5rem !important" }}>
+                <div className="d-flex gap-2 mb-3 align-items-center flex-wrap">
+                  {["all", "subscription", "invoice"].map((t) => (
+                    <button
+                      key={t}
+                      className={`btn btn-sm ${paymentsTypeFilter === t ? "btn-primary" : "btn-outline-secondary"}`}
+                      onClick={() => {
+                        setPaymentsTypeFilter(t);
+                        setPaymentsPage(1);
+                        setPaymentsFadeKey((k) => k + 1);
+                        fetchPayments(1, t, paymentsUserFilter);
+                      }}
+                    >
+                      {t === "all" ? "All" : t.charAt(0).toUpperCase() + t.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                {paymentsLoading ? (
+                  <div className="text-center py-4 text-soft">
+                    <span
+                      style={{
+                        display: "inline-block",
+                        width: 20,
+                        height: 20,
+                        border: "2px solid var(--brand)",
+                        borderTopColor: "transparent",
+                        borderRadius: "50%",
+                        animation: "spin 0.6s linear infinite",
+                        marginRight: 8,
+                        verticalAlign: "middle",
+                      }}
+                    />
+                    Loading payments...
+                  </div>
+                ) : payments.length === 0 ? (
+                  <div className="text-center py-4 text-soft fade-slide-in">
+                    No payments found.
+                  </div>
+                ) : (
+                  <div key={paymentsFadeKey} className="fade-slide-in">
+                    <div className="table-responsive">
+                      <table className="table table-hover align-middle mb-0">
+                        <thead>
+                          <tr>
+                            <th>Date</th>
+                            {!paymentsUserFilter && <th>Business</th>}
+                            <th className="text-center">Type</th>
+                            <th>Amount</th>
+                            <th>Invoice</th>
+                            <th>Plan</th>
+                            <th className="text-center">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {payments.map((p) => (
+                            <tr key={p._id}>
+                              <td style={{ whiteSpace: "nowrap" }}>
+                                {new Date(p.createdAt).toLocaleDateString("en-IN", {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                              </td>
+                              {!paymentsUserFilter && (
+                                <td>
+                                  {p.businessId
+                                    ? `${p.businessId.businessName || "-"}`
+                                    : "-"}
+                                </td>
+                              )}
+                              <td className="text-center">
+                                <span className={p.type === "subscription" ? "badge-plan" : "badge-type-invoice"}>
+                                  {p.type === "subscription" ? "Subscription" : "Invoice"}
+                                </span>
+                              </td>
+                              <td className="fw-bold">
+                                {"\u20B9"}{Number(p.amount).toLocaleString("en-IN")}
+                              </td>
+                              <td>
+                                {p.invoiceId
+                                  ? `${p.invoiceId.invoiceNumber || "-"}`
+                                  : "-"}
+                              </td>
+                              <td>
+                                {p.plan ? p.plan.charAt(0).toUpperCase() + p.plan.slice(1) : "-"}
+                              </td>
+                              <td className="text-center">
+                                <span className="invoice-status-paid">{p.status}</span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {paymentsTotalPages > 1 && (
+                      <div className="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
+                        <small className="text-soft">
+                          Page {paymentsPage} of {paymentsTotalPages} &middot; {paymentsTotal} total
+                        </small>
+                        <div className="d-flex gap-2">
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={paymentsPage === 1}
+                            onClick={() => {
+                              setPaymentsPage(paymentsPage - 1);
+                              fetchPayments(paymentsPage - 1, paymentsTypeFilter, paymentsUserFilter);
+                            }}
+                          >
+                            Previous
+                          </button>
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            disabled={paymentsPage === paymentsTotalPages}
+                            onClick={() => {
+                              setPaymentsPage(paymentsPage + 1);
+                              fetchPayments(paymentsPage + 1, paymentsTypeFilter, paymentsUserFilter);
+                            }}
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer" style={{ flexShrink: 0 }}>
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={closePaymentsModal}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CSS for animations */}
       <style>{`
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+        @keyframes fadeSlideIn {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes modalSlideIn {
+          from {
+            opacity: 0;
+            transform: scale(0.92) translateY(16px);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+        @keyframes rowFadeIn {
+          from {
+            opacity: 0;
+            transform: translateX(-8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        .fade-slide-in {
+          animation: fadeSlideIn 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .fade-slide-in .table tbody tr {
+          animation: rowFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+        }
+        .fade-slide-in .table tbody tr:nth-child(1) { animation-delay: 0.05s; }
+        .fade-slide-in .table tbody tr:nth-child(2) { animation-delay: 0.1s; }
+        .fade-slide-in .table tbody tr:nth-child(3) { animation-delay: 0.15s; }
+        .fade-slide-in .table tbody tr:nth-child(4) { animation-delay: 0.2s; }
+        .fade-slide-in .table tbody tr:nth-child(5) { animation-delay: 0.25s; }
+        .fade-slide-in .table tbody tr:nth-child(6) { animation-delay: 0.3s; }
+        .fade-slide-in .table tbody tr:nth-child(7) { animation-delay: 0.35s; }
+        .fade-slide-in .table tbody tr:nth-child(8) { animation-delay: 0.4s; }
+        .fade-slide-in .table tbody tr:nth-child(9) { animation-delay: 0.45s; }
+        .fade-slide-in .table tbody tr:nth-child(10) { animation-delay: 0.5s; }
+        .modal-content {
+          animation: modalSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .modal-backdrop {
+          animation: fadeIn 0.3s ease-out;
         }
       `}</style>
     </div>

@@ -253,7 +253,7 @@ async function generateInvoicePdf(doc, invoice, business) {
   doc.font("Helvetica-Bold").fontSize(9);
   const invNumH  = doc.heightOfString(invoice.invoiceNumber || "-", { width: colInnerW });
   const custNameH = doc.heightOfString(invoice.customerName  || "-", { width: colInnerW });
-  const payMode   = (invoice.status === "Paid" ? "PAID" : invoice.paymentMode || "CASH").toUpperCase();
+  const payMode   = (invoice.paymentMode || "CASH").toUpperCase();
   const payModeH  = doc.heightOfString(payMode,                  { width: colInnerW });
   const formattedPhone = formatPhone(invoice.customerPhone);
   const phoneH    = doc.heightOfString(formattedPhone, { width: colInnerW });
@@ -446,6 +446,102 @@ async function generateInvoicePdf(doc, invoice, business) {
   });
 
   y += TOTAL_H + 14;
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // PAYMENT DETAILS (only when paid)
+  // ─────────────────────────────────────────────────────────────────────────
+  if (invoice.status === "Paid") {
+    const PAY_ROW_H = 14;
+
+    doc.save()
+      .strokeColor(BORDER).lineWidth(0.5)
+      .moveTo(MARGIN, y).lineTo(PAGE_WIDTH_PT - MARGIN, y).stroke()
+      .restore();
+    y += 8;
+
+    // Heading badge
+    const pdBadgeW = 88;
+    const pdBadgeH = 15;
+    const pdBadgeX = (PAGE_WIDTH_PT - pdBadgeW) / 2;
+    filledRect(doc, pdBadgeX, y, pdBadgeW, pdBadgeH, 3, ACCENT);
+    doc.font("Helvetica-Bold").fontSize(7).fillColor(WHITE);
+    doc.text("PAYMENT DETAILS", pdBadgeX, y + 4, {
+      width: pdBadgeW,
+      align: "center",
+      characterSpacing: 1,
+      lineBreak: false,
+    });
+    y += pdBadgeH + 10;
+
+    // Build rows data first to measure
+    const rows = [];
+    rows.push({ label: "Mode", value: (invoice.paymentMode || "Cash").toUpperCase() });
+
+    const paidDate = invoice.paidAt
+      ? new Date(invoice.paidAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+      : "-";
+    rows.push({ label: "Paid On", value: paidDate });
+
+    const paidTime = invoice.paidAt
+      ? new Date(invoice.paidAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+      : "-";
+    rows.push({ label: "Time", value: paidTime });
+
+    if (invoice.razorpayPaymentId) {
+      rows.push({ label: "Payment ID", value: invoice.razorpayPaymentId });
+    }
+
+    // Find max label width
+    let maxLabelW = 0;
+    doc.font("Helvetica-Bold").fontSize(8);
+    rows.forEach((r) => {
+      const w = doc.widthOfString(r.label);
+      if (w > maxLabelW) maxLabelW = w;
+    });
+
+    const gapBeforeColon = 6;
+    const gapAfterColon = 8;
+    const colonW = doc.widthOfString(":");
+    const totalLabelColW = maxLabelW + gapBeforeColon + colonW + gapAfterColon;
+
+    // Find max value width
+    let maxValW = 0;
+    doc.font("Helvetica").fontSize(8);
+    rows.forEach((r) => {
+      const w = doc.widthOfString(r.value || "-");
+      if (w > maxValW) maxValW = w;
+    });
+
+    // Center the entire block (shifted slightly right)
+    const blockW = totalLabelColW + maxValW;
+    const blockX = MARGIN + (CONTENT_W - blockW) / 2 + 20;
+    const colonX = blockX + maxLabelW + gapBeforeColon;
+    const valueX = colonX + colonW + gapAfterColon;
+
+    rows.forEach((r) => {
+      // Label (right-aligned so all end at same position)
+      doc.font("Helvetica-Bold").fontSize(8).fillColor(MUTED);
+      doc.text(r.label, blockX, y, {
+        width: maxLabelW,
+        align: "right",
+        lineBreak: false,
+      });
+      // Colon (fixed position, all align vertically)
+      doc.text(":", colonX, y, { lineBreak: false });
+      // Value (fixed position after colon)
+      doc.font("Helvetica").fontSize(8).fillColor(TEXT);
+      doc.text(r.value || "-", valueX, y, { lineBreak: false });
+      y += PAY_ROW_H;
+    });
+
+    y += 4;
+
+    doc.save()
+      .strokeColor(BORDER).lineWidth(0.5)
+      .moveTo(MARGIN, y).lineTo(PAGE_WIDTH_PT - MARGIN, y).stroke()
+      .restore();
+    y += 6;
+  }
 
   // ─────────────────────────────────────────────────────────────────────────
   // FOOTER

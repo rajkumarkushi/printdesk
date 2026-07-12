@@ -58,6 +58,20 @@ const invoiceSchema = new mongoose.Schema(
       enum: ["Unpaid", "Paid"],
       default: "Unpaid",
     },
+
+    paymentMode: {
+      type: String,
+      enum: ["Cash", "UPI", "Card", "Netbanking", "Razorpay"],
+      default: "Cash",
+    },
+    razorpayPaymentId: {
+      type: String,
+      default: null,
+    },
+    paidAt: {
+      type: Date,
+      default: null,
+    },
     // Soft delete flag – when true, invoice is hidden in UI but still counts towards usage
     isDeleted: {
       type: Boolean,

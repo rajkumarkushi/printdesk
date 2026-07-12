@@ -68,7 +68,8 @@ function Register() {
           </div>
           <div className="form-floating mb-3">
             <input type="tel" name="phone" className="form-control" id="floatingPhone" placeholder="Phone Number" onChange={handleChange} />
-            <label htmlFor="floatingPhone">Phone Number</label>
+            <label htmlFor="floatingPhone">Phone Number (Indian, 10 digits)</label>
+            <small className="text-muted">Required for online payments via Razorpay</small>
           </div>
           <div className="form-floating mb-3">
             <input type="text" name="address" className="form-control" id="floatingAddress" placeholder="Business Address" onChange={handleChange} />
