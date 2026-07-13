@@ -247,6 +247,8 @@ body {
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
+  position: relative;
+  z-index: 1050;
 }
 
 .brand-mark {

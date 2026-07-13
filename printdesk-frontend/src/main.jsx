@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './index.css'
 import './App.css'
+import './i18n'
 import App from './App.jsx'
 
 const savedTheme = localStorage.getItem("theme") || "system";

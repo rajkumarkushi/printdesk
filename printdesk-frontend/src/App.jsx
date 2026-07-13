@@ -9,6 +9,8 @@ import EditInvoice from "../pages/EditInvoice";
 import AdminDashboard from "../pages/AdminDashboard";
 import UploadLogo from "../pages/UploadLogo";
 import PaymentHistory from "../pages/PaymentHistory";
+import ForgotPassword from "../pages/ForgotPassword";
+import ResetPassword from "../pages/ResetPassword";
 
 
 function App() {
@@ -19,6 +21,8 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/upload-logo/:id" element={<UploadLogo />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="/admin-dashboard" element={<AdminDashboard />} />
 
         <Route

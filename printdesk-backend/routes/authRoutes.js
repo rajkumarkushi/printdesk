@@ -10,7 +10,7 @@
 const express = require("express");
 const multer = require("multer");
 const path = require("path");
-const { register, login, registerLogo } = require("../controllers/authController");
+const { register, login, registerLogo, forgotPassword, resetPassword } = require("../controllers/authController");
 
 const router = express.Router();
 
@@ -42,5 +42,7 @@ const upload = multer({
 router.post("/register", register);
 router.post("/login", login);
 router.post("/register-logo/:id", upload.single("logo"), registerLogo);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password/:token", resetPassword);
 
 module.exports = router;

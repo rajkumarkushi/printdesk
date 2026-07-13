@@ -261,7 +261,13 @@ exports.downloadUserInvoicePdf = async (req, res) => {
 // ======================================
 exports.downloadAllPaymentsPdf = async (req, res) => {
   try {
-    const payments = await Payment.find()
+    const activeInvoiceIds = await Invoice.find({ isDeleted: false }).distinct("_id");
+    const payments = await Payment.find({
+      $or: [
+        { invoiceId: null },
+        { invoiceId: { $in: activeInvoiceIds } },
+      ],
+    })
       .populate("invoiceId", "invoiceNumber customerName")
       .populate("businessId", "businessName")
       .sort({ createdAt: -1 });
@@ -593,7 +599,18 @@ exports.downloadUserPaymentsPdf = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const payments = await Payment.find({ businessId: business._id })
+    const activeInvoiceIds = await Invoice.find({
+      businessId: business._id,
+      isDeleted: false,
+    }).distinct("_id");
+
+    const payments = await Payment.find({
+      businessId: business._id,
+      $or: [
+        { invoiceId: null },
+        { invoiceId: { $in: activeInvoiceIds } },
+      ],
+    })
       .populate("invoiceId", "invoiceNumber customerName")
       .sort({ createdAt: -1 });
 
@@ -656,16 +673,24 @@ exports.downloadUserPaymentsPdf = async (req, res) => {
 
     doc.font("Helvetica").fontSize(11);
 
-    details.forEach(([label, value], i) => {
-      const rowY = y + i * 20;
+    const colonX = 155;
+
+    details.forEach(([label, value]) => {
+      const startY = doc.y;
       doc
         .fillColor("#555555")
-        .text(`${label}:`, labelX, rowY, { width: 120, continued: false })
+        .text(label, labelX, startY, { width: 100, lineBreak: false });
+      doc
+        .text(":", colonX, startY, { width: 20, lineBreak: false });
+      doc
         .fillColor("#000000")
-        .text(value, valueX, rowY, { width: 370, ellipsis: true });
+        .text(value || "-", valueX, startY, { width: 370, ellipsis: true });
+      const afterValue = doc.y;
+      const afterLabel = startY + doc.heightOfString(label, { width: 100 });
+      doc.y = Math.max(afterLabel, afterValue) + 6;
     });
 
-    y += details.length * 20 + 15;
+    y = doc.y + 15;
 
     doc
       .moveTo(50, y)
@@ -817,7 +842,14 @@ exports.getAllPayments = async (req, res) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
     const skip = (page - 1) * limit;
 
-    const filter = {};
+    const activeInvoiceIds = await Invoice.find({ isDeleted: false }).distinct("_id");
+
+    const filter = {
+      $or: [
+        { invoiceId: null },
+        { invoiceId: { $in: activeInvoiceIds } },
+      ],
+    };
 
     if (req.query.type && req.query.type !== "all") {
       filter.type = req.query.type;
@@ -858,7 +890,18 @@ exports.getUserPayments = async (req, res) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
     const skip = (page - 1) * limit;
 
-    const filter = { businessId: req.params.id };
+    const activeInvoiceIds = await Invoice.find({
+      businessId: req.params.id,
+      isDeleted: false,
+    }).distinct("_id");
+
+    const filter = {
+      businessId: req.params.id,
+      $or: [
+        { invoiceId: null },
+        { invoiceId: { $in: activeInvoiceIds } },
+      ],
+    };
 
     if (req.query.type && req.query.type !== "all") {
       filter.type = req.query.type;
@@ -949,7 +992,7 @@ exports.downloadUserSummaryPdf = async (req, res) => {
       .lineTo(545, y)
       .strokeColor("#cccccc")
       .stroke();
-    y += 20;
+    y += 10;
 
     // Business Summary section header
     doc
@@ -957,7 +1000,8 @@ exports.downloadUserSummaryPdf = async (req, res) => {
       .fillColor("#000000")
       .font("Helvetica-Bold")
       .text("Business Summary", 50, y);
-    y += 25;
+    y += 55;
+    doc.y = y;
 
     // Business details with aligned layout
     const labelX = 50;
@@ -976,17 +1020,24 @@ exports.downloadUserSummaryPdf = async (req, res) => {
 
     doc.font("Helvetica").fontSize(11);
 
-    details.forEach(([label, value], i) => {
-      const rowY = y + i * 20;
+    const colonX = 155;
 
+    details.forEach(([label, value]) => {
+      const startY = doc.y;
       doc
         .fillColor("#555555")
-        .text(`${label}:`, labelX, rowY, { width: 120, continued: false })
+        .text(label, labelX, startY, { width: 100, lineBreak: false });
+      doc
+        .text(":", colonX, startY, { width: 20, lineBreak: false });
+      doc
         .fillColor("#000000")
-        .text(value, valueX, rowY, { width: 370, ellipsis: true });
+        .text(value || "-", valueX, startY, { width: 370, ellipsis: true });
+      const afterValue = doc.y;
+      const afterLabel = startY + doc.heightOfString(label, { width: 100 });
+      doc.y = Math.max(afterLabel, afterValue) + 6;
     });
 
-    y += details.length * 20 + 15;
+    y = doc.y + 15;
 
     // Divider line
     doc

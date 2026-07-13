@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import API from "../services/api";
 import billoraLogo from "../src/assets/billora.png";
 import ThemeToggle from "../src/components/ThemeToggle";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 function AdminDashboard() {
   const [stats, setStats] = useState({});
@@ -39,6 +41,7 @@ function AdminDashboard() {
   const [paymentsFadeKey, setPaymentsFadeKey] = useState(0);
 
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const fetchPayments = async (page = 1, type = "all", userId = null) => {
     setPaymentsLoading(true);
@@ -215,10 +218,11 @@ function AdminDashboard() {
       const { data } = await API.get(
         `/admin/users/${user._id}/invoices?page=${page}&limit=10`
       );
-      setInvoiceModalInvoices(data.invoices);
-      setInvoiceModalTotalPages(data.totalPages);
-      setInvoiceModalTotal(data.total);
+      setInvoiceModalInvoices(data.invoices || []);
+      setInvoiceModalTotalPages(data.totalPages || 1);
+      setInvoiceModalTotal(data.total || 0);
     } catch (error) {
+      console.error("Failed to fetch invoices:", error);
       const msg = error.response?.data?.message || "Failed to fetch invoices";
       alert(msg);
     } finally {
@@ -344,7 +348,7 @@ function AdminDashboard() {
             <div>
               <div className="brand-title fs-5">Billora</div>
               <small className="text-soft" style={{ fontSize: "0.75rem" }}>
-                Admin
+                {t("common.admin")}
               </small>
             </div>
           </div>
@@ -353,14 +357,15 @@ function AdminDashboard() {
               className="btn btn-outline-primary btn-sm"
               onClick={openAllPaymentsModal}
             >
-              All Payments
+              {t("admin.allPayments")}
             </button>
+            <LanguageSwitcher />
             <ThemeToggle />
             <button
               className="btn btn-outline-secondary btn-sm"
               onClick={handleLogout}
             >
-              Logout
+              {t("common.logout")}
             </button>
           </div>
         </div>
@@ -371,31 +376,31 @@ function AdminDashboard() {
         <div className="row g-3 mb-4">
           <div className="col-md-3 col-sm-6">
             <div className="stat-card brand-accent p-4">
-              <p className="metric-label mb-2">Total Users</p>
+              <p className="metric-label mb-2">{t("admin.totalUsers")}</p>
               <p className="metric-value">{stats.totalUsers ?? 0}</p>
             </div>
           </div>
           <div className="col-md-3 col-sm-6">
             <div className="stat-card success-accent p-4">
-              <p className="metric-label mb-2">Free Users</p>
+              <p className="metric-label mb-2">{t("admin.freeUsers")}</p>
               <p className="metric-value">{stats.freeUsers ?? 0}</p>
             </div>
           </div>
           <div className="col-md-3 col-sm-6">
             <div className="stat-card warning-accent p-4">
-              <p className="metric-label mb-2">Basic Users</p>
+              <p className="metric-label mb-2">{t("admin.basicUsers")}</p>
               <p className="metric-value">{stats.basicUsers ?? 0}</p>
             </div>
           </div>
           <div className="col-md-3 col-sm-6">
             <div className="stat-card info-accent p-4">
-              <p className="metric-label mb-2">Pro Users</p>
+              <p className="metric-label mb-2">{t("admin.proUsers")}</p>
               <p className="metric-value">{stats.proUsers ?? 0}</p>
             </div>
           </div>
           <div className="col-md-3 col-sm-6 mt-md-3">
             <div className="stat-card danger-accent p-4">
-              <p className="metric-label mb-2">Total Invoices</p>
+              <p className="metric-label mb-2">{t("admin.totalInvoices")}</p>
               <p className="metric-value">{stats.totalInvoices ?? 0}</p>
             </div>
           </div>
@@ -406,7 +411,7 @@ function AdminDashboard() {
           <div className="d-flex flex-wrap gap-3 align-items-center justify-content-between">
             <div className="d-flex flex-wrap gap-2">
               {[
-                { key: "all", label: "All" },
+                { key: "all", label: t("common.all") },
                 { key: "free", label: "Free" },
                 { key: "basic", label: "Basic" },
                 { key: "pro", label: "Pro" },
@@ -448,7 +453,7 @@ function AdminDashboard() {
                 type="text"
                 className="form-control"
                 style={{ paddingLeft: 36, paddingRight: searchTerm ? 32 : 12 }}
-                placeholder="Search by business or email..."
+                placeholder={t("admin.searchPlaceholder")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={(e) => {
@@ -516,7 +521,7 @@ function AdminDashboard() {
         {/* Users Table */}
         <div className="admin-table-wrapper">
           <div className="p-4 border-bottom d-flex justify-content-between align-items-center">
-            <h5 className="fw-bold mb-0">All Businesses</h5>
+            <h5 className="fw-bold mb-0">{t("admin.allBusinesses")}</h5>
             <div className="d-flex align-items-center gap-3">
               {loading && (
                 <span className="text-soft small">
@@ -533,22 +538,22 @@ function AdminDashboard() {
                       verticalAlign: "middle",
                     }}
                   />
-                  Saving changes...
+                  {t("admin.savingChanges")}
                 </span>
               )}
-              <span className="badge-plan">{usersTotal} total</span>
+              <span className="badge-plan">{usersTotal} {t("common.total")}</span>
             </div>
           </div>
           <div className="table-responsive">
             <table className="table table-hover align-middle mb-0">
               <thead>
                 <tr>
-                  <th>Business</th>
-                  <th>Email</th>
-                  <th>Plan</th>
-                  <th>Invoice Limit</th>
-                  <th>Created</th>
-                  <th className="text-end" style={{ minWidth: 240 }}>Actions</th>
+                  <th>{t("admin.business")}</th>
+                  <th>{t("admin.email")}</th>
+                  <th>{t("admin.plan")}</th>
+                  <th>{t("admin.invoiceLimit")}</th>
+                  <th>{t("admin.created")}</th>
+                  <th className="text-end" style={{ minWidth: 240 }}>{t("admin.actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -557,7 +562,7 @@ function AdminDashboard() {
                     <td colSpan={6} className="text-center text-soft py-5">
                       <div className="empty-state">
                         <div className="empty-state-icon">&#128100;</div>
-                        <p className="mb-0">No users found matching your filters.</p>
+                        <p className="mb-0">{t("admin.empty")}</p>
                       </div>
                     </td>
                   </tr>
@@ -565,7 +570,7 @@ function AdminDashboard() {
                 {filteredUsers.map((user) => {
                   const normalisedPlan = (user.plan || "free").toLowerCase();
                   const isProPlan = normalisedPlan === "pro";
-                  const displayLimit = isProPlan ? "Unlimited" : user.invoiceLimit ?? "-";
+                  const displayLimit = isProPlan ? t("admin.unlimited") : user.invoiceLimit ?? "-";
 
                   const planColors = {
                     free: { color: "var(--brand)", bg: "rgba(79, 70, 229, 0.08)" },
@@ -603,28 +608,34 @@ function AdminDashboard() {
                       <td>
                         <div className="d-flex flex-wrap gap-2 justify-content-end">
                           <button
+                            className="btn btn-sm btn-outline-success"
+                            onClick={() => handleDownloadUserSummaryPdf(user)}
+                          >
+                            {t("common.pdf")}
+                          </button>
+                          <button
                             className="btn btn-sm btn-outline-secondary"
                             onClick={() => openEditUser(user)}
                           >
-                            Edit
+                            {t("common.edit")}
                           </button>
                           <button
                             className="btn btn-sm btn-outline-primary"
                             onClick={() => openInvoicesModal(user)}
                           >
-                            Invoices
+                            {t("admin.invoices")}
                           </button>
                           <button
                             className="btn btn-sm btn-outline-info"
                             onClick={() => openUserPaymentsModal(user)}
                           >
-                            Payments
+                            {t("admin.payments")}
                           </button>
                           <button
                             className="btn btn-sm btn-outline-danger"
                             onClick={() => handleDeleteUser(user._id)}
                           >
-                            Delete
+                            {t("common.delete")}
                           </button>
                         </div>
                       </td>
@@ -637,7 +648,7 @@ function AdminDashboard() {
           {usersTotalPages > 1 && (
             <div className="d-flex justify-content-between align-items-center px-4 py-3 border-top">
               <small className="text-soft">
-                Page {usersPage} of {usersTotalPages}
+                {t("common.page")} {usersPage} {t("common.of")} {usersTotalPages}
               </small>
               <div className="d-flex gap-2">
                 <button
@@ -648,7 +659,7 @@ function AdminDashboard() {
                     fetchUsers(usersPage - 1, searchTerm, selectedPlanFilter, startDate, endDate);
                   }}
                 >
-                  Previous
+                  {t("common.previous")}
                 </button>
                 <button
                   className="btn btn-sm btn-outline-secondary"
@@ -658,7 +669,7 @@ function AdminDashboard() {
                     fetchUsers(usersPage + 1, searchTerm, selectedPlanFilter, startDate, endDate);
                   }}
                 >
-                  Next
+                  {t("common.next")}
                 </button>
               </div>
             </div>
@@ -692,7 +703,7 @@ function AdminDashboard() {
             <div
               className="modal-header"
             >
-              <h5 className="fw-bold mb-0">Edit User</h5>
+              <h5 className="fw-bold mb-0">{t("admin.editUser")}</h5>
               <button
                 type="button"
                 className="btn-close"
@@ -701,7 +712,7 @@ function AdminDashboard() {
             </div>
             <div className="p-4">
               <div className="mb-3">
-                <label className="form-label">Business Name</label>
+                <label className="form-label">{t("admin.business")}</label>
                 <input
                   type="text"
                   className="form-control"
@@ -711,7 +722,7 @@ function AdminDashboard() {
                 />
               </div>
               <div className="mb-3">
-                <label className="form-label">Email</label>
+                <label className="form-label">{t("admin.email")}</label>
                 <input
                   type="email"
                   className="form-control"
@@ -721,7 +732,7 @@ function AdminDashboard() {
                 />
               </div>
               <div className="mb-3">
-                <label className="form-label">Plan</label>
+                <label className="form-label">{t("admin.plan")}</label>
                 <select
                   className="form-select"
                   name="plan"
@@ -734,7 +745,7 @@ function AdminDashboard() {
                 </select>
               </div>
               <div className="mb-3">
-                <label className="form-label">Invoice Limit</label>
+                <label className="form-label">{t("admin.invoiceLimitLabel")}</label>
                 <input
                   type="number"
                   className="form-control"
@@ -751,7 +762,7 @@ function AdminDashboard() {
                 className="btn btn-outline-secondary"
                 onClick={() => setEditingUser(null)}
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <button
                 type="button"
@@ -759,7 +770,7 @@ function AdminDashboard() {
                 onClick={handleSaveUser}
                 disabled={loading}
               >
-                {loading ? "Saving..." : "Save Changes"}
+                {loading ? t("common.saving") : t("admin.saveChanges")}
               </button>
             </div>
           </div>
@@ -778,7 +789,7 @@ function AdminDashboard() {
             <div className="modal-content" style={{ borderRadius: "var(--radius-lg)", maxHeight: "90vh", display: "flex", flexDirection: "column", background: "var(--panel)" }}>
               <div className="modal-header" style={{ flexShrink: 0 }}>
                 <div>
-                  <h5 className="modal-title fw-bold">Invoices</h5>
+                  <h5 className="modal-title fw-bold">{t("admin.invoices")}</h5>
                   <small className="text-soft d-block">
                     {invoiceModalUser.businessName} &mdash; {invoiceModalUser.email}
                   </small>
@@ -800,11 +811,11 @@ function AdminDashboard() {
                         verticalAlign: "middle",
                       }}
                     />
-                    Loading invoices...
+                    {t("admin.loadingInvoices")}
                   </div>
                 ) : invoiceModalInvoices.length === 0 ? (
                   <div className="text-center py-4 text-soft">
-                    No invoices found for this user.
+                    {t("admin.noInvoices")}
                   </div>
                 ) : (
                   <>
@@ -812,11 +823,11 @@ function AdminDashboard() {
                       <table className="table table-hover align-middle mb-0">
                         <thead>
                           <tr>
-                            <th>Invoice No</th>
-                            <th>Customer</th>
-                            <th>Total</th>
-                            <th>Created</th>
-                            <th className="text-end">Download</th>
+                            <th>{t("admin.invoiceNo")}</th>
+                            <th>{t("admin.customer")}</th>
+                            <th>{t("admin.totalLabel")}</th>
+                            <th>{t("admin.createdLabel")}</th>
+                            <th className="text-end">{t("admin.download")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -840,7 +851,7 @@ function AdminDashboard() {
                                     )
                                   }
                                 >
-                                  PDF
+                                  {t("common.pdf")}
                                 </button>
                               </td>
                             </tr>
@@ -851,7 +862,7 @@ function AdminDashboard() {
                     {invoiceModalTotalPages > 1 && (
                       <div className="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
                         <small className="text-soft">
-                          Page {invoiceModalPage} of {invoiceModalTotalPages} &middot; {invoiceModalTotal} total
+                          {t("common.page")} {invoiceModalPage} {t("common.of")} {invoiceModalTotalPages} &middot; {invoiceModalTotal} {t("common.total")}
                         </small>
                         <div className="d-flex gap-2">
                           <button
@@ -861,7 +872,7 @@ function AdminDashboard() {
                               openInvoicesModal(invoiceModalUser, invoiceModalPage - 1)
                             }
                           >
-                            Previous
+                            {t("common.previous")}
                           </button>
                           <button
                             className="btn btn-sm btn-outline-secondary"
@@ -870,7 +881,7 @@ function AdminDashboard() {
                               openInvoicesModal(invoiceModalUser, invoiceModalPage + 1)
                             }
                           >
-                            Next
+                            {t("common.next")}
                           </button>
                         </div>
                       </div>
@@ -884,7 +895,7 @@ function AdminDashboard() {
                   className="btn btn-outline-secondary"
                   onClick={closeInvoicesModal}
                 >
-                  Close
+                  {t("common.close")}
                 </button>
               </div>
             </div>
@@ -904,26 +915,26 @@ function AdminDashboard() {
             <div className="modal-content" style={{ borderRadius: "var(--radius-lg)", maxHeight: "90vh", display: "flex", flexDirection: "column", background: "var(--panel)" }}>
               <div className="modal-header" style={{ flexShrink: 0 }}>
                 <div>
-                  <h5 className="modal-title fw-bold">Payment History</h5>
+                  <h5 className="modal-title fw-bold">{t("admin.paymentHistory")}</h5>
                   <small className="text-soft d-block">
-                    {paymentsUserFilter ? "User payments" : "All payments across users"}
+                    {paymentsUserFilter ? t("admin.userPayments") : t("admin.allPaymentsAcross")}
                   </small>
                 </div>
               </div>
               <div className="modal-body p-4" style={{ overflowY: "auto", flex: "1 1 auto", padding: "1.5rem !important" }}>
                 <div className="d-flex gap-2 mb-3 align-items-center flex-wrap">
-                  {["all", "subscription", "invoice"].map((t) => (
+                  {["all", "subscription", "invoice"].map((type) => (
                     <button
-                      key={t}
-                      className={`btn btn-sm ${paymentsTypeFilter === t ? "btn-primary" : "btn-outline-secondary"}`}
+                      key={type}
+                      className={`btn btn-sm ${paymentsTypeFilter === type ? "btn-primary" : "btn-outline-secondary"}`}
                       onClick={() => {
-                        setPaymentsTypeFilter(t);
+                        setPaymentsTypeFilter(type);
                         setPaymentsPage(1);
                         setPaymentsFadeKey((k) => k + 1);
-                        fetchPayments(1, t, paymentsUserFilter);
+                        fetchPayments(1, type, paymentsUserFilter);
                       }}
                     >
-                      {t === "all" ? "All" : t.charAt(0).toUpperCase() + t.slice(1)}
+                      {type === "all" ? t("common.all") : type === "subscription" ? t("admin.subscription") : t("admin.invoiceType")}
                     </button>
                   ))}
                 </div>
@@ -942,11 +953,11 @@ function AdminDashboard() {
                         verticalAlign: "middle",
                       }}
                     />
-                    Loading payments...
+                    {t("admin.loadingPayments")}
                   </div>
                 ) : payments.length === 0 ? (
                   <div className="text-center py-4 text-soft fade-slide-in">
-                    No payments found.
+                    {t("admin.noPayments")}
                   </div>
                 ) : (
                   <div key={paymentsFadeKey} className="fade-slide-in">
@@ -954,13 +965,13 @@ function AdminDashboard() {
                       <table className="table table-hover align-middle mb-0">
                         <thead>
                           <tr>
-                            <th>Date</th>
-                            {!paymentsUserFilter && <th>Business</th>}
-                            <th className="text-center">Type</th>
-                            <th>Amount</th>
-                            <th>Invoice</th>
-                            <th>Plan</th>
-                            <th className="text-center">Status</th>
+                            <th>{t("admin.date")}</th>
+                            {!paymentsUserFilter && <th>{t("admin.business")}</th>}
+                            <th className="text-center">{t("admin.type")}</th>
+                            <th>{t("admin.amount")}</th>
+                            <th>{t("admin.invoiceLabel")}</th>
+                            <th>{t("admin.planLabel")}</th>
+                            <th className="text-center">{t("admin.statusLabel")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -982,7 +993,7 @@ function AdminDashboard() {
                               )}
                               <td className="text-center">
                                 <span className={p.type === "subscription" ? "badge-plan" : "badge-type-invoice"}>
-                                  {p.type === "subscription" ? "Subscription" : "Invoice"}
+                                  {p.type === "subscription" ? t("admin.subscription") : t("admin.invoiceType")}
                                 </span>
                               </td>
                               <td className="fw-bold">
@@ -1007,7 +1018,7 @@ function AdminDashboard() {
                     {paymentsTotalPages > 1 && (
                       <div className="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
                         <small className="text-soft">
-                          Page {paymentsPage} of {paymentsTotalPages} &middot; {paymentsTotal} total
+                          {t("common.page")} {paymentsPage} {t("common.of")} {paymentsTotalPages} &middot; {paymentsTotal} {t("common.total")}
                         </small>
                         <div className="d-flex gap-2">
                           <button
@@ -1018,7 +1029,7 @@ function AdminDashboard() {
                               fetchPayments(paymentsPage - 1, paymentsTypeFilter, paymentsUserFilter);
                             }}
                           >
-                            Previous
+                            {t("common.previous")}
                           </button>
                           <button
                             className="btn btn-sm btn-outline-secondary"
@@ -1028,7 +1039,7 @@ function AdminDashboard() {
                               fetchPayments(paymentsPage + 1, paymentsTypeFilter, paymentsUserFilter);
                             }}
                           >
-                            Next
+                            {t("common.next")}
                           </button>
                         </div>
                       </div>
@@ -1042,7 +1053,7 @@ function AdminDashboard() {
                   className="btn btn-outline-secondary"
                   onClick={closePaymentsModal}
                 >
-                  Close
+                  {t("common.close")}
                 </button>
               </div>
             </div>

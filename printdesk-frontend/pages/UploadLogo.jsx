@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import API from "../services/api";
 import billoraLogo from "../src/assets/billora.png";
 
 function UploadLogo() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -52,7 +54,7 @@ function UploadLogo() {
       });
       navigate("/login");
     } catch (err) {
-      alert(err.response?.data?.message || "Logo upload failed");
+      alert(err.response?.data?.message || t("uploadLogo.error"));
     } finally {
       setUploading(false);
     }
@@ -77,11 +79,10 @@ function UploadLogo() {
               }}
             />
           </div>
-          <div className="brand-title fs-3 mb-1">Add Business Logo</div>
-          <p className="text-soft mb-0 small">Customize your invoice with your logo (optional).</p>
+          <div className="brand-title fs-3 mb-1">{t("uploadLogo.title")}</div>
+          <p className="text-soft mb-0 small">{t("uploadLogo.subtitle")}</p>
         </div>
 
-        {/* Drag and Drop Zone */}
         <div
           className={`upload-zone mb-4 p-4 border border-dashed rounded-3 position-relative ${
             dragActive ? "border-primary bg-light-subtle" : "border-secondary-subtle"
@@ -120,9 +121,9 @@ function UploadLogo() {
             </div>
           ) : (
             <div className="text-muted">
-              <div className="fs-1 mb-2">📁</div>
-              <p className="mb-1 small fw-medium">Drag & drop your logo here, or <span className="text-primary">browse</span></p>
-              <p className="mb-0 text-soft extra-small">Supports PNG, JPG (Max 2MB)</p>
+              <div className="fs-1 mb-2">&#128193;</div>
+              <p className="mb-1 small fw-medium">{t("uploadLogo.drag")} <span className="text-primary">{t("uploadLogo.browse")}</span></p>
+              <p className="mb-0 text-soft extra-small">{t("uploadLogo.support")}</p>
             </div>
           )}
         </div>
@@ -133,14 +134,14 @@ function UploadLogo() {
             onClick={handleSkip}
             disabled={uploading}
           >
-            Skip
+            {t("common.skip")}
           </button>
           <button
             className="btn btn-primary px-4 py-2 w-50"
             onClick={handleUpload}
             disabled={!file || uploading}
           >
-            {uploading ? "Uploading..." : "Upload Logo"}
+            {uploading ? t("uploadLogo.uploading") : t("uploadLogo.submit")}
           </button>
         </div>
       </div>

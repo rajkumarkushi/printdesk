@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 function BusinessProfile() {
   const [businessName, setBusinessName] = useState("");
@@ -10,6 +11,7 @@ function BusinessProfile() {
   const [logoUrl, setLogoUrl] = useState("");
   const [logoFile, setLogoFile] = useState(null);
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -39,9 +41,9 @@ function BusinessProfile() {
         gstNumber,
       });
 
-      alert("Profile Updated Successfully");
+      alert(t("profile.successUpdate"));
     } catch (error) {
-      alert("Error updating profile");
+      alert(t("profile.errUpdate"));
     }
   };
 
@@ -54,7 +56,7 @@ function BusinessProfile() {
   const handleLogoUpload = async (e) => {
     e.preventDefault();
     if (!logoFile) {
-      alert("Please select a logo file first");
+      alert(t("profile.errSelectLogo"));
       return;
     }
 
@@ -67,9 +69,9 @@ function BusinessProfile() {
       });
 
       setLogoUrl(res.data.logoUrl);
-      alert("Logo updated successfully");
+      alert(t("profile.successLogo"));
     } catch (error) {
-      alert("Error uploading logo");
+      alert(t("profile.errUploadLogo"));
     }
   };
 
@@ -80,59 +82,59 @@ function BusinessProfile() {
           <div>
             <h5 className="mb-1 text-primary">Billora</h5>
             <small className="text-muted d-block mb-1">
-              Smart Billing for Growing Businesses
+              {t("profile.title")}
             </small>
-            <h3 className="mb-0">{businessName || "Your Business"}</h3>
+            <h3 className="mb-0">{businessName || t("profile.yourBusiness")}</h3>
           </div>
           <button
             type="button"
             className="btn btn-outline-secondary"
             onClick={() => navigate(-1)}
           >
-            Close
+            {t("common.close")}
           </button>
         </div>
 
         <form onSubmit={handleSubmit}>
           <input
             className="form-control mb-3"
-            placeholder="Business Name"
+            placeholder={t("profile.businessName")}
             value={businessName}
             onChange={(e) => setBusinessName(e.target.value)}
           />
 
           <input
             className="form-control mb-3"
-            placeholder="Phone Number (Indian, 10 digits)"
+            placeholder={t("profile.phone")}
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
           />
           <small className="text-muted d-block mb-3" style={{ marginTop: "-8px" }}>
-            Required for online payments via Razorpay
+            {t("profile.phoneHelp")}
           </small>
 
           <textarea
             className="form-control mb-3"
-            placeholder="Business Address"
+            placeholder={t("profile.address")}
             value={address}
             onChange={(e) => setAddress(e.target.value)}
           />
 
           <input
             className="form-control mb-3"
-            placeholder="GST Number"
+            placeholder={t("profile.gst")}
             value={gstNumber}
             onChange={(e) => setGstNumber(e.target.value)}
           />
 
           <button className="btn btn-primary mb-3">
-            Save Profile
+            {t("profile.saveProfile")}
           </button>
         </form>
 
         <hr />
 
-        <h5>Business Logo</h5>
+        <h5>{t("profile.businessLogo")}</h5>
         {logoUrl && (
           <div className="mb-3">
             <img
@@ -151,7 +153,7 @@ function BusinessProfile() {
             onChange={handleLogoChange}
           />
           <button className="btn btn-secondary">
-            Upload Logo
+            {t("profile.uploadLogo")}
           </button>
         </form>
       </div>

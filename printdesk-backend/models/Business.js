@@ -24,6 +24,9 @@ const businessSchema = new mongoose.Schema(
       enum: ["user", "admin"],
       default: "user",
     },
+
+    resetPasswordToken: { type: String, default: null },
+    resetPasswordExpire: { type: Date, default: null },
   },
   { timestamps: true }
 );

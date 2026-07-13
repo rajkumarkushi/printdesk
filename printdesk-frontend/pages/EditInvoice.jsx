@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import API from "../services/api";
 import { useNavigate, useParams } from "react-router-dom";
 import ThemeToggle from "../src/components/ThemeToggle";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 function EditInvoice() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const [customerName, setCustomerName] = useState("");
@@ -26,7 +29,7 @@ function EditInvoice() {
         setGstPercent(data.gstPercent || 18);
         setDiscount(data.discount || 0);
       } catch (error) {
-        alert("Error loading invoice");
+        alert(t("editInvoice.errLoad"));
       }
     };
     fetchInvoice();
@@ -57,29 +60,29 @@ function EditInvoice() {
     e.preventDefault();
 
     if (!customerName.trim()) {
-      alert("Please enter customer name");
+      alert(t("createInvoice.errName"));
       return;
     }
     if (!customerPhone.trim()) {
-      alert("Please enter customer phone number");
+      alert(t("createInvoice.errPhone"));
       return;
     }
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       if (!item.itemType.trim()) {
-        alert(`Please enter item type for item ${i + 1}`);
+        alert(t("createInvoice.errItemType", { num: i + 1 }));
         return;
       }
       if (!item.designName.trim()) {
-        alert(`Please enter design name for item ${i + 1}`);
+        alert(t("createInvoice.errDesign", { num: i + 1 }));
         return;
       }
       if (!item.quantity || Number(item.quantity) <= 0) {
-        alert(`Please enter a valid quantity for item ${i + 1}`);
+        alert(t("createInvoice.errQty", { num: i + 1 }));
         return;
       }
       if (!item.price || Number(item.price) <= 0) {
-        alert(`Please enter a valid price for item ${i + 1}`);
+        alert(t("createInvoice.errPrice", { num: i + 1 }));
         return;
       }
     }
@@ -93,10 +96,10 @@ function EditInvoice() {
         gstPercent,
         discount,
       });
-      alert("Invoice Updated Successfully");
+      alert(t("editInvoice.success"));
       navigate("/dashboard");
     } catch (error) {
-      alert("Error updating invoice");
+      alert(t("editInvoice.errUpdate"));
     }
   };
 
@@ -105,17 +108,18 @@ function EditInvoice() {
       <div className="invoice-form-card bg-white p-4 p-md-5">
         <div className="d-flex justify-content-between align-items-center mb-4">
           <div>
-            <p className="metric-label mb-1">Edit invoice</p>
-            <h3 className="fw-bold mb-0">Edit Invoice</h3>
+            <p className="metric-label mb-1">{t("editInvoice.metric")}</p>
+            <h3 className="fw-bold mb-0">{t("editInvoice.title")}</h3>
           </div>
           <div className="d-flex gap-2">
             <ThemeToggle />
+            <LanguageSwitcher />
             <button
               type="button"
               className="btn btn-outline-secondary btn-sm"
               onClick={() => navigate(-1)}
             >
-              &times; Close
+              &times; {t("close")}
             </button>
           </div>
         </div>
@@ -123,75 +127,75 @@ function EditInvoice() {
         <form onSubmit={handleSubmit}>
           <div className="row g-3 mb-4">
             <div className="col-md-4">
-              <label className="form-label">Customer Name</label>
+              <label className="form-label">{t("createInvoice.customerName")}</label>
               <input
                 className="form-control"
-                placeholder="Customer Name"
+                placeholder={t("createInvoice.customerNamePlaceholder")}
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 required
               />
             </div>
             <div className="col-md-4">
-              <label className="form-label">Customer Phone</label>
+              <label className="form-label">{t("createInvoice.customerPhone")}</label>
               <input
                 className="form-control"
-                placeholder="Customer Phone"
+                placeholder={t("createInvoice.customerPhonePlaceholder")}
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
                 required
               />
             </div>
             <div className="col-md-4">
-              <label className="form-label">Status</label>
+              <label className="form-label">{t("editInvoice.status")}</label>
               <select
                 className="form-select"
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
               >
-                <option value="Unpaid">Unpaid</option>
-                <option value="Paid">Paid</option>
+                <option value="Unpaid">{t("unpaid")}</option>
+                <option value="Paid">{t("paid")}</option>
               </select>
             </div>
           </div>
 
           <div className="d-flex justify-content-between align-items-center mb-3">
-            <h5 className="fw-bold mb-0">Items</h5>
+            <h5 className="fw-bold mb-0">{t("createInvoice.items")}</h5>
             <button
               type="button"
               className="btn btn-outline-secondary btn-sm"
               onClick={addItem}
             >
-              + Add Item
+              {t("createInvoice.addItem")}
             </button>
           </div>
 
           {items.map((item, index) => (
             <div key={index} className="item-row row g-3 align-items-end mb-3">
               <div className="col-md-3">
-                <label className="form-label">Item Type</label>
+                <label className="form-label">{t("createInvoice.itemType")}</label>
                 <input
                   name="itemType"
                   className="form-control"
-                  placeholder="Item Type"
+                  placeholder={t("createInvoice.itemTypePlaceholder")}
                   value={item.itemType}
                   onChange={(e) => handleItemChange(index, e)}
                   required
                 />
               </div>
               <div className="col-md-3">
-                <label className="form-label">Design Name</label>
+                <label className="form-label">{t("createInvoice.designName")}</label>
                 <input
                   name="designName"
                   className="form-control"
-                  placeholder="Design Name"
+                  placeholder={t("createInvoice.designNamePlaceholder")}
                   value={item.designName}
                   onChange={(e) => handleItemChange(index, e)}
                   required
                 />
               </div>
               <div className="col-md-2">
-                <label className="form-label">Qty</label>
+                <label className="form-label">{t("createInvoice.qty")}</label>
                 <input
                   name="quantity"
                   type="number"
@@ -203,7 +207,7 @@ function EditInvoice() {
                 />
               </div>
               <div className="col-md-2">
-                <label className="form-label">Price</label>
+                <label className="form-label">{t("createInvoice.price")}</label>
                 <input
                   name="price"
                   type="number"
@@ -221,17 +225,17 @@ function EditInvoice() {
                   onClick={() => removeItem(index)}
                   disabled={items.length === 1}
                 >
-                  Remove
+                  {t("createInvoice.remove")}
                 </button>
               </div>
             </div>
           ))}
 
           <div className="summary-card p-4 mt-4">
-            <h6 className="fw-bold mb-3">Summary</h6>
+            <h6 className="fw-bold mb-3">{t("createInvoice.summary")}</h6>
             <div className="row g-3 mb-3">
               <div className="col-md-6">
-                <label className="form-label">GST Rate</label>
+                <label className="form-label">{t("createInvoice.gstRate")}</label>
                 <select
                   className="form-select"
                   value={gstPercent}
@@ -245,11 +249,11 @@ function EditInvoice() {
                 </select>
               </div>
               <div className="col-md-6">
-                <label className="form-label">Discount (%)</label>
+                <label className="form-label">{t("createInvoice.discount")}</label>
                 <input
                   type="number"
                   className="form-control"
-                  placeholder="e.g. 5"
+                  placeholder={t("createInvoice.discountPlaceholder")}
                   value={discount}
                   onChange={(e) => setDiscount(Number(e.target.value))}
                 />
@@ -265,16 +269,16 @@ function EditInvoice() {
               }}
             >
               <div className="d-flex justify-content-between mb-2">
-                <span className="text-soft">Subtotal</span>
+                <span className="text-soft">{t("createInvoice.subtotal")}</span>
                 <span className="fw-semibold">&#8377;{subtotal.toLocaleString("en-IN")}</span>
               </div>
               <div className="d-flex justify-content-between mb-2">
-                <span className="text-soft">GST ({gstPercent}%)</span>
+                <span className="text-soft">{t("createInvoice.gst", { percent: gstPercent })}</span>
                 <span className="fw-semibold">&#8377;{gstAmount.toLocaleString("en-IN")}</span>
               </div>
               {discount > 0 && (
                 <div className="d-flex justify-content-between mb-3">
-                  <span className="text-soft">Discount ({discount}%)</span>
+                  <span className="text-soft">{t("createInvoice.discountLabel", { percent: discount })}</span>
                   <span className="fw-semibold">&#8377;{discountAmount.toLocaleString("en-IN")}</span>
                 </div>
               )}
@@ -282,7 +286,7 @@ function EditInvoice() {
                 className="d-flex justify-content-between pt-3"
                 style={{ borderTop: "2px solid var(--line)" }}
               >
-                <span className="metric-label mb-0">Total</span>
+                <span className="metric-label mb-0">{t("createInvoice.total")}</span>
                 <h4 className="fw-bold mb-0" style={{ color: "var(--brand)" }}>
                   &#8377;{totalAmount.toLocaleString("en-IN")}
                 </h4>
@@ -291,7 +295,7 @@ function EditInvoice() {
           </div>
 
           <button className="btn btn-primary mt-4 px-5 py-2">
-            Update Invoice
+            {t("editInvoice.update")}
           </button>
         </form>
       </div>

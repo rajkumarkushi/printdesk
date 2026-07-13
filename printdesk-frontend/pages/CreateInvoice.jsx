@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../src/components/ThemeToggle";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 function CreateInvoice() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -36,29 +39,29 @@ function CreateInvoice() {
     e.preventDefault();
 
     if (!customerName.trim()) {
-      alert("Please enter customer name");
+      alert(t("createInvoice.errName"));
       return;
     }
     if (!customerPhone.trim()) {
-      alert("Please enter customer phone number");
+      alert(t("createInvoice.errPhone"));
       return;
     }
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       if (!item.itemType.trim()) {
-        alert(`Please enter item type for item ${i + 1}`);
+        alert(t("createInvoice.errItemType", { num: i + 1 }));
         return;
       }
       if (!item.designName.trim()) {
-        alert(`Please enter design name for item ${i + 1}`);
+        alert(t("createInvoice.errDesign", { num: i + 1 }));
         return;
       }
       if (!item.quantity || Number(item.quantity) <= 0) {
-        alert(`Please enter a valid quantity for item ${i + 1}`);
+        alert(t("createInvoice.errQty", { num: i + 1 }));
         return;
       }
       if (!item.price || Number(item.price) <= 0) {
-        alert(`Please enter a valid price for item ${i + 1}`);
+        alert(t("createInvoice.errPrice", { num: i + 1 }));
         return;
       }
     }
@@ -72,29 +75,30 @@ function CreateInvoice() {
         discount,
       });
 
-      alert("Invoice Created");
+      alert(t("createInvoice.success"));
       navigate("/dashboard");
     } catch (error) {
-      alert(error.response?.data?.message || "Error creating invoice");
+      alert(error.response?.data?.message || t("createInvoice.errCreate"));
     }
   };
 
   return (
     <div className="invoice-page">
       <div className="invoice-form-card bg-white p-4 p-md-5">
-        <div className="d-flex justify-content-between align-items-center mb-4">
+          <div className="d-flex justify-content-between align-items-center mb-4">
           <div>
-            <p className="metric-label mb-1">New invoice</p>
-            <h3 className="fw-bold mb-0">Create Invoice</h3>
+            <p className="metric-label mb-1">{t("createInvoice.metric")}</p>
+            <h3 className="fw-bold mb-0">{t("createInvoice.title")}</h3>
           </div>
           <div className="d-flex gap-2">
             <ThemeToggle />
+            <LanguageSwitcher />
             <button
               type="button"
               className="btn btn-outline-secondary btn-sm"
               onClick={() => navigate(-1)}
             >
-              &times; Close
+              &times; {t("close")}
             </button>
           </div>
         </div>
@@ -102,20 +106,20 @@ function CreateInvoice() {
         <form onSubmit={handleSubmit}>
           <div className="row g-3 mb-4">
             <div className="col-md-6">
-              <label className="form-label">Customer Name</label>
+              <label className="form-label">{t("createInvoice.customerName")}</label>
               <input
                 className="form-control"
-                placeholder="Enter customer name"
+                placeholder={t("createInvoice.customerNamePlaceholder")}
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 required
               />
             </div>
             <div className="col-md-6">
-              <label className="form-label">Customer Phone</label>
+              <label className="form-label">{t("createInvoice.customerPhone")}</label>
               <input
                 className="form-control"
-                placeholder="Enter phone number"
+                placeholder={t("createInvoice.customerPhonePlaceholder")}
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
                 required
@@ -124,42 +128,42 @@ function CreateInvoice() {
           </div>
 
           <div className="d-flex justify-content-between align-items-center mb-4">
-            <h5 className="fw-bold mb-0">Items</h5>
+            <h5 className="fw-bold mb-0">{t("createInvoice.items")}</h5>
             <button
               type="button"
               className="btn btn-outline-secondary btn-sm"
               onClick={addItem}
             >
-              + Add Item
+              {t("createInvoice.addItem")}
             </button>
           </div>
 
           {items.map((item, index) => (
             <div key={index} className="item-row row g-3 align-items-end mb-3">
               <div className="col-md-3">
-                <label className="form-label">Item Type</label>
+                <label className="form-label">{t("createInvoice.itemType")}</label>
                 <input
                   name="itemType"
                   className="form-control"
-                  placeholder="e.g. T-Shirt"
+                  placeholder={t("createInvoice.itemTypePlaceholder")}
                   value={item.itemType}
                   onChange={(e) => handleItemChange(index, e)}
                   required
                 />
               </div>
               <div className="col-md-3">
-                <label className="form-label">Design Name</label>
+                <label className="form-label">{t("createInvoice.designName")}</label>
                 <input
                   name="designName"
                   className="form-control"
-                  placeholder="e.g. Custom Print"
+                  placeholder={t("createInvoice.designNamePlaceholder")}
                   value={item.designName}
                   onChange={(e) => handleItemChange(index, e)}
                   required
                 />
               </div>
               <div className="col-md-2">
-                <label className="form-label">Qty</label>
+                <label className="form-label">{t("createInvoice.qty")}</label>
                 <input
                   name="quantity"
                   type="number"
@@ -171,7 +175,7 @@ function CreateInvoice() {
                 />
               </div>
               <div className="col-md-2">
-                <label className="form-label">Price</label>
+                <label className="form-label">{t("createInvoice.price")}</label>
                 <input
                   name="price"
                   type="number"
@@ -189,17 +193,17 @@ function CreateInvoice() {
                   onClick={() => removeItem(index)}
                   disabled={items.length === 1}
                 >
-                  Remove
+                  {t("createInvoice.remove")}
                 </button>
               </div>
             </div>
           ))}
 
           <div className="summary-card p-4 mt-4">
-            <h6 className="fw-bold mb-3">Summary</h6>
+            <h6 className="fw-bold mb-3">{t("createInvoice.summary")}</h6>
             <div className="row g-3 mb-3">
               <div className="col-md-6">
-                <label className="form-label">GST Rate</label>
+                <label className="form-label">{t("createInvoice.gstRate")}</label>
                 <select
                   className="form-select"
                   value={gstPercent}
@@ -213,11 +217,11 @@ function CreateInvoice() {
                 </select>
               </div>
               <div className="col-md-6">
-                <label className="form-label">Discount (%)</label>
+                <label className="form-label">{t("createInvoice.discount")}</label>
                 <input
                   type="number"
                   className="form-control"
-                  placeholder="e.g. 5"
+                  placeholder={t("createInvoice.discountPlaceholder")}
                   value={discount}
                   onChange={(e) => setDiscount(Number(e.target.value))}
                 />
@@ -233,16 +237,16 @@ function CreateInvoice() {
               }}
             >
               <div className="d-flex justify-content-between mb-2">
-                <span className="text-soft">Subtotal</span>
+                <span className="text-soft">{t("createInvoice.subtotal")}</span>
                 <span className="fw-semibold">&#8377;{subtotal.toLocaleString("en-IN")}</span>
               </div>
               <div className="d-flex justify-content-between mb-2">
-                <span className="text-soft">GST ({gstPercent}%)</span>
+                <span className="text-soft">{t("createInvoice.gst", { percent: gstPercent })}</span>
                 <span className="fw-semibold">&#8377;{gstAmount.toLocaleString("en-IN")}</span>
               </div>
               {discount > 0 && (
                 <div className="d-flex justify-content-between mb-3">
-                  <span className="text-soft">Discount ({discount}%)</span>
+                  <span className="text-soft">{t("createInvoice.discountLabel", { percent: discount })}</span>
                   <span className="fw-semibold">&#8377;{discountAmount.toLocaleString("en-IN")}</span>
                 </div>
               )}
@@ -250,7 +254,7 @@ function CreateInvoice() {
                 className="d-flex justify-content-between pt-3"
                 style={{ borderTop: "2px solid var(--line)" }}
               >
-                <span className="metric-label mb-0">Total</span>
+                <span className="metric-label mb-0">{t("createInvoice.total")}</span>
                 <h4 className="fw-bold mb-0" style={{ color: "var(--brand)" }}>
                   &#8377;{totalAmount.toLocaleString("en-IN")}
                 </h4>
@@ -259,7 +263,7 @@ function CreateInvoice() {
           </div>
 
           <button className="btn btn-primary mt-4 px-5 py-2">
-            Create Invoice
+            {t("createInvoice.submit")}
           </button>
         </form>
       </div>

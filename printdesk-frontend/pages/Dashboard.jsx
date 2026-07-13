@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import billoraLogo from "../src/assets/billora.png";
 import ThemeToggle from "../src/components/ThemeToggle";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 function Dashboard() {
   const [invoices, setInvoices] = useState([]);
@@ -17,13 +19,14 @@ function Dashboard() {
   const [endDate, setEndDate] = useState("");
   const limit = 10;
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const markPaid = async (id) => {
     try {
       await API.put(`/invoices/${id}/paid`);
       fetchInvoices(page);
     } catch (error) {
-      alert("Failed to update status");
+      alert(t("dashboard.errStatus"));
     }
   };
 
@@ -87,7 +90,7 @@ function Dashboard() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this invoice?")) return;
+    if (!window.confirm(t("dashboard.deleteConfirm"))) return;
     try {
       const res = await API.delete(`/invoices/${id}`);
       if (res.status === 200 || res.status === 404) {
@@ -100,7 +103,7 @@ function Dashboard() {
         fetchUsage();
         return;
       }
-      alert(error.response?.data?.message || "Error deleting invoice");
+      alert(error.response?.data?.message || t("dashboard.errDelete"));
     }
   };
 
@@ -116,14 +119,14 @@ function Dashboard() {
       document.body.appendChild(link);
       link.click();
     } catch (error) {
-      alert("Download failed");
+      alert(t("dashboard.errDownload"));
     }
   };
 
   const openRazorpayCheckout = async (plan) => {
     try {
       if (typeof window.Razorpay === "undefined") {
-        alert("Payment system is loading. Please try again in a moment.");
+        alert(t("dashboard.errPaymentLoading"));
         return;
       }
 
@@ -147,7 +150,7 @@ function Dashboard() {
             alert(data.message);
             window.location.reload();
           } catch (error) {
-            alert(error.response?.data?.message || "Payment verification failed");
+            alert(error.response?.data?.message || t("dashboard.errPaymentVerify"));
           }
         },
         prefill: {
@@ -188,7 +191,7 @@ function Dashboard() {
       const rzp = new window.Razorpay(options);
       rzp.open();
     } catch (error) {
-      alert(error.response?.data?.message || "Failed to initiate payment");
+      alert(error.response?.data?.message || t("dashboard.errPaymentInit"));
     }
   };
 
@@ -204,7 +207,7 @@ function Dashboard() {
   const openRazorpayInvoiceCheckout = async (invoiceId) => {
     try {
       if (typeof window.Razorpay === "undefined") {
-        alert("Payment system is loading. Please try again in a moment.");
+        alert(t("dashboard.errPaymentLoading"));
         return;
       }
 
@@ -229,7 +232,7 @@ function Dashboard() {
             fetchInvoices(page);
             fetchUsage();
           } catch (error) {
-            alert(error.response?.data?.message || "Payment verification failed");
+            alert(error.response?.data?.message || t("dashboard.errPaymentVerify"));
           }
         },
         prefill: {
@@ -270,7 +273,7 @@ function Dashboard() {
       const rzp = new window.Razorpay(options);
       rzp.open();
     } catch (error) {
-      alert(error.response?.data?.message || "Failed to initiate payment");
+      alert(error.response?.data?.message || t("dashboard.errPaymentInit"));
     }
   };
 
@@ -298,7 +301,7 @@ function Dashboard() {
             </div>
             <div>
               <div className="brand-title fs-5">Billora</div>
-              <small className="text-soft" style={{ fontSize: "0.75rem" }}>User</small>
+              <small className="text-soft" style={{ fontSize: "0.75rem" }}>{t("common.user")}</small>
             </div>
           </div>
 
@@ -319,20 +322,21 @@ function Dashboard() {
                 borderRadius: "50%",
                 background: "var(--success)"
               }} />
-              {profile?.businessName || "Business"}
+              {profile?.businessName || t("common.business")}
             </div>
             <button
               className="btn btn-outline-primary btn-sm"
               onClick={() => navigate("/payment-history")}
             >
-              Payments
+              {t("dashboard.payments")}
             </button>
+            <LanguageSwitcher />
             <ThemeToggle />
             <button
               className="btn btn-outline-secondary btn-sm"
               onClick={handleLogout}
             >
-              Logout
+              {t("common.logout")}
             </button>
           </div>
         </div>
@@ -341,30 +345,30 @@ function Dashboard() {
       <main className="app-shell py-4">
         <div className="dashboard-header d-flex flex-wrap justify-content-between align-items-end gap-3">
           <div>
-            <p className="metric-label mb-2">Dashboard</p>
+            <p className="metric-label mb-2">{t("dashboard.metric")}</p>
             <h1 className="fw-bold mb-1">
-              Welcome{profile?.businessName ? `, ${profile.businessName}` : ""}
+              {t("dashboard.welcome")}{profile?.businessName ? `, ${profile.businessName}` : ""}
             </h1>
-            <p className="text-soft mb-0">Track billing activity, usage, and invoices from one place.</p>
+            <p className="text-soft mb-0">{t("dashboard.welcomeDesc")}</p>
           </div>
           <button
             className="btn btn-primary px-4 py-2"
             onClick={() => navigate("/create-invoice")}
           >
-            + Create Invoice
+            {t("dashboard.createInvoice")}
           </button>
         </div>
 
         <div className="row g-3 mb-4">
           <div className="col-md-3 col-sm-6">
             <div className="stat-card brand-accent p-4">
-              <p className="metric-label mb-2">Current Plan</p>
+              <p className="metric-label mb-2">{t("dashboard.currentPlan")}</p>
               <p className="metric-value">{usage?.plan ? usage.plan.toUpperCase() : "-"}</p>
             </div>
           </div>
           <div className="col-md-3 col-sm-6">
             <div className="stat-card success-accent p-4">
-              <p className="metric-label mb-2">Invoices Used</p>
+              <p className="metric-label mb-2">{t("dashboard.invoicesUsed")}</p>
               <p className="metric-value">
                 {usage
                   ? usage.plan === "pro"
@@ -376,13 +380,13 @@ function Dashboard() {
           </div>
           <div className="col-md-3 col-sm-6">
             <div className="stat-card warning-accent p-4">
-              <p className="metric-label mb-2">15 Day Revenue</p>
+              <p className="metric-label mb-2">{t("dashboard.revenue15")}</p>
               <p className="metric-value">&#8377;{totalRevenue.toLocaleString("en-IN")}</p>
             </div>
           </div>
           <div className="col-md-3 col-sm-6">
             <div className="stat-card info-accent p-4">
-              <p className="metric-label mb-2">Total Invoices</p>
+              <p className="metric-label mb-2">{t("dashboard.totalInvoices")}</p>
               <p className="metric-value">{total}</p>
             </div>
           </div>
@@ -391,26 +395,26 @@ function Dashboard() {
         <div className="summary-card p-4 mb-4">
           <div className="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div>
-              <h5 className="fw-bold mb-1">Plan controls</h5>
+              <h5 className="fw-bold mb-1">{t("dashboard.planControls")}</h5>
               <p className="text-soft small mb-0">
-                Remaining:{" "}
-                {usage?.plan === "pro" ? "Unlimited" : usage?.remaining ?? "-"}
+                {t("dashboard.remaining")}{" "}
+                {usage?.plan === "pro" ? t("dashboard.unlimited") : usage?.remaining ?? "-"}
               </p>
             </div>
             <div className="d-flex flex-wrap gap-2">
               {usage?.plan === "free" && (
                 <>
                   <button className="btn btn-outline-warning btn-sm" onClick={handleUpgradeBasic}>
-                    Basic &#8377;199/month
+                    {t("dashboard.basicPlan")}
                   </button>
                   <button className="btn btn-warning btn-sm" onClick={handleUpgradePro}>
-                    Pro &#8377;399/month
+                    {t("dashboard.proPlan")}
                   </button>
                 </>
               )}
               {usage?.plan === "basic" && (
                 <button className="btn btn-warning btn-sm" onClick={handleUpgradePro}>
-                  Upgrade to Pro &#8377;399/month
+                  {t("dashboard.upgradePro")}
                 </button>
               )}
             </div>
@@ -419,16 +423,16 @@ function Dashboard() {
 
         <div className="modern-card table-card bg-white">
           <div className="px-4 pt-4 pb-3 border-bottom">
-            <h5 className="fw-bold mb-2">Invoices</h5>
+            <h5 className="fw-bold mb-2">{t("dashboard.invoices")}</h5>
             <div className="d-flex flex-wrap gap-3 align-items-end justify-content-center">
               <div style={{ maxWidth: 280, width: "100%" }}>
-                <label className="form-label small text-soft">Search</label>
+                <label className="form-label small text-soft">{t("dashboard.search")}</label>
                 <div className="position-relative">
                   <input
                     type="text"
                     className="form-control"
                     style={{ paddingRight: searchTerm ? 32 : 12 }}
-                    placeholder="Customer, phone or invoice no..."
+                    placeholder={t("dashboard.searchPlaceholder")}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     onKeyDown={(e) => {
@@ -466,7 +470,7 @@ function Dashboard() {
                 </div>
               </div>
               <div style={{ minWidth: 120 }}>
-                <label className="form-label small text-soft">Status</label>
+                <label className="form-label small text-soft">{t("dashboard.status")}</label>
                 <select
                   className="form-select"
                   value={statusFilter}
@@ -476,13 +480,13 @@ function Dashboard() {
                     fetchInvoices(1, searchTerm, e.target.value, startDate, endDate);
                   }}
                 >
-                  <option value="all">All</option>
-                  <option value="Paid">Paid</option>
-                  <option value="Unpaid">Unpaid</option>
+                  <option value="all">{t("common.all")}</option>
+                  <option value="Paid">{t("common.paid")}</option>
+                  <option value="Unpaid">{t("common.unpaid")}</option>
                 </select>
               </div>
               <div style={{ minWidth: 150 }}>
-                <label className="form-label small text-soft">From</label>
+                <label className="form-label small text-soft">{t("dashboard.from")}</label>
                 <input
                   type="date"
                   className="form-control"
@@ -495,7 +499,7 @@ function Dashboard() {
                 />
               </div>
               <div style={{ minWidth: 150 }}>
-                <label className="form-label small text-soft">To</label>
+                <label className="form-label small text-soft">{t("dashboard.to")}</label>
                 <input
                   type="date"
                   className="form-control"
@@ -510,7 +514,7 @@ function Dashboard() {
               <div>
                 <label className="form-label small text-soft">&nbsp;</label>
                 <div>
-                  <span className="badge-plan">{total} total</span>
+                  <span className="badge-plan">{total} {t("common.total")}</span>
                 </div>
               </div>
             </div>
@@ -519,12 +523,12 @@ function Dashboard() {
             <table className="table table-hover align-middle mb-0">
               <thead>
                 <tr>
-                  <th>Invoice No</th>
-                  <th>Customer</th>
-                  <th>Items</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th className="text-end">Actions</th>
+                  <th>{t("dashboard.invoiceNo")}</th>
+                  <th>{t("dashboard.customer")}</th>
+                  <th>{t("dashboard.items")}</th>
+                  <th>{t("dashboard.amount")}</th>
+                  <th>{t("dashboard.statusLabel")}</th>
+                  <th className="text-end">{t("dashboard.actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -533,7 +537,7 @@ function Dashboard() {
                     <td colSpan={6} className="text-center text-soft py-5">
                       <div className="empty-state">
                         <div className="empty-state-icon">&#128196;</div>
-                        <p className="mb-0">No invoices yet. Create your first invoice to get started.</p>
+                        <p className="mb-0">{t("dashboard.empty")}</p>
                       </div>
                     </td>
                   </tr>
@@ -554,7 +558,7 @@ function Dashboard() {
                     </td>
                     <td>
                       <span className={inv.status === "Paid" ? "invoice-status-paid" : "invoice-status-unpaid"}>
-                        {inv.status || "Unpaid"}
+                        {inv.status || t("common.unpaid")}
                       </span>
                     </td>
                     <td>
@@ -563,29 +567,29 @@ function Dashboard() {
                           <button
                             className="btn btn-sm btn-success"
                             onClick={() => openRazorpayInvoiceCheckout(inv._id)}
-                            title="Pay Online via Razorpay"
+                            title={t("dashboard.payOnline")}
                           >
-                            &#128176; Pay
+                            &#128176; {t("common.pay")}
                           </button>
                         )}
                         <button
                           className="btn btn-sm btn-outline-success"
                           onClick={() => handleDownload(inv._id)}
-                          title="Download PDF"
+                          title={t("dashboard.downloadPdf")}
                         >
-                          &#128196; PDF
+                          &#128196; {t("common.pdf")}
                         </button>
                         <button
                           className="btn btn-sm btn-outline-primary"
                           onClick={() => navigate(`/edit-invoice/${inv._id}`)}
-                          title="Edit Invoice"
+                          title={t("dashboard.editInvoice")}
                         >
-                          &#9998; Edit
+                          &#9998; {t("common.edit")}
                         </button>
                         <button
                           className="btn btn-sm btn-outline-danger"
                           onClick={() => handleDelete(inv._id)}
-                          title="Delete Invoice"
+                          title={t("dashboard.deleteInvoice")}
                         >
                           &#128465;
                         </button>
@@ -599,7 +603,7 @@ function Dashboard() {
           {totalPages > 1 && (
             <div className="d-flex justify-content-between align-items-center px-4 py-3 border-top">
               <small className="text-soft">
-                Page {page} of {totalPages}
+                {t("common.page")} {page} {t("common.of")} {totalPages}
               </small>
               <div className="d-flex gap-2">
                 <button
@@ -610,7 +614,7 @@ function Dashboard() {
                     fetchInvoices(page - 1);
                   }}
                 >
-                  Previous
+                  {t("common.previous")}
                 </button>
                 <button
                   className="btn btn-sm btn-outline-secondary"
@@ -620,7 +624,7 @@ function Dashboard() {
                     fetchInvoices(page + 1);
                   }}
                 >
-                  Next
+                  {t("common.next")}
                 </button>
               </div>
             </div>

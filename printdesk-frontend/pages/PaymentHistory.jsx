@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import API from "../services/api";
 import billoraLogo from "../src/assets/billora.png";
 import ThemeToggle from "../src/components/ThemeToggle";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 function PaymentHistory() {
   const [payments, setPayments] = useState([]);
@@ -14,6 +16,7 @@ function PaymentHistory() {
   const [profile, setProfile] = useState(null);
   const limit = 10;
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const fetchPayments = async (currentPage = page, type = typeFilter) => {
     const params = new URLSearchParams({ page: currentPage, limit });
@@ -75,7 +78,7 @@ function PaymentHistory() {
             </div>
             <div>
               <div className="brand-title fs-5">Billora</div>
-              <small className="text-soft" style={{ fontSize: "0.75rem" }}>User</small>
+              <small className="text-soft" style={{ fontSize: "0.75rem" }}>{t("common.user")}</small>
             </div>
           </div>
 
@@ -91,11 +94,12 @@ function PaymentHistory() {
               }}
             >
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--success)" }} />
-              {profile?.businessName || "Business"}
+              {profile?.businessName || t("common.business")}
             </div>
+            <LanguageSwitcher />
             <ThemeToggle />
             <button className="btn btn-outline-secondary btn-sm" onClick={handleLogout}>
-              Logout
+              {t("common.logout")}
             </button>
           </div>
         </div>
@@ -104,15 +108,15 @@ function PaymentHistory() {
       <main className="app-shell py-4">
         <div className="dashboard-header d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
           <div>
-            <p className="metric-label mb-2">Payments</p>
-            <h1 className="fw-bold mb-1">Payment History</h1>
-            <p className="text-soft mb-0">View all your subscription and invoice payments.</p>
+            <p className="metric-label mb-2">{t("payments.metric")}</p>
+            <h1 className="fw-bold mb-1">{t("payments.title")}</h1>
+            <p className="text-soft mb-0">{t("payments.subtitle")}</p>
           </div>
           <button
             className="btn btn-outline-primary btn-sm"
             onClick={() => navigate("/dashboard")}
           >
-            Back to Dashboard
+            {t("payments.backDashboard")}
           </button>
         </div>
 
@@ -120,7 +124,7 @@ function PaymentHistory() {
           <div className="px-4 pt-4 pb-3 border-bottom">
             <div className="d-flex flex-wrap gap-3 align-items-end">
               <div style={{ minWidth: 150 }}>
-                <label className="form-label small text-soft">Type</label>
+                <label className="form-label small text-soft">{t("payments.type")}</label>
                 <select
                   className="form-select"
                   value={typeFilter}
@@ -131,15 +135,15 @@ function PaymentHistory() {
                     fetchPayments(1, e.target.value);
                   }}
                 >
-                  <option value="all">All</option>
-                  <option value="subscription">Subscription</option>
-                  <option value="invoice">Invoice</option>
+                  <option value="all">{t("common.all")}</option>
+                  <option value="subscription">{t("payments.subscription")}</option>
+                  <option value="invoice">{t("payments.invoiceType")}</option>
                 </select>
               </div>
               <div>
                 <label className="form-label small text-soft">&nbsp;</label>
                 <div>
-                  <span className="badge-plan">{total} total</span>
+                  <span className="badge-plan">{total} {t("common.total")}</span>
                 </div>
               </div>
             </div>
@@ -149,13 +153,13 @@ function PaymentHistory() {
             <table className="table table-hover align-middle mb-0">
               <thead>
                 <tr>
-                  <th>Date</th>
-                    <th className="text-center">Type</th>
-                  <th>Amount</th>
-                  <th>Invoice</th>
-                  <th>Plan</th>
-                    <th className="text-center">Status</th>
-                  <th>Razorpay Payment ID</th>
+                  <th>{t("payments.date")}</th>
+                    <th className="text-center">{t("payments.type")}</th>
+                  <th>{t("payments.amount")}</th>
+                  <th>{t("payments.invoiceLabel")}</th>
+                  <th>{t("payments.planLabel")}</th>
+                    <th className="text-center">{t("payments.statusLabel")}</th>
+                  <th>{t("payments.razorpayId")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -164,7 +168,7 @@ function PaymentHistory() {
                     <td colSpan={7} className="text-center text-soft py-5">
                       <div className="empty-state">
                         <div className="empty-state-icon">&#128176;</div>
-                        <p className="mb-0">No payments yet.</p>
+                        <p className="mb-0">{t("payments.empty")}</p>
                       </div>
                     </td>
                   </tr>
@@ -174,7 +178,7 @@ function PaymentHistory() {
                     <td style={{ whiteSpace: "nowrap" }}>{formatDate(p.createdAt)}</td>
                     <td className="text-center">
                       <span className={p.type === "subscription" ? "badge-plan" : "badge-type-invoice"}>
-                        {p.type === "subscription" ? "Subscription" : "Invoice"}
+                        {p.type === "subscription" ? t("payments.subscription") : t("payments.invoiceType")}
                       </span>
                     </td>
                     <td className="fw-bold" style={{ color: "var(--ink)" }}>
@@ -202,7 +206,7 @@ function PaymentHistory() {
           {totalPages > 1 && (
             <div className="d-flex justify-content-between align-items-center px-4 py-3 border-top">
               <small className="text-soft">
-                Page {page} of {totalPages}
+                {t("common.page")} {page} {t("common.of")} {totalPages}
               </small>
               <div className="d-flex gap-2">
                 <button
@@ -213,7 +217,7 @@ function PaymentHistory() {
                     fetchPayments(page - 1);
                   }}
                 >
-                  Previous
+                  {t("common.previous")}
                 </button>
                 <button
                   className="btn btn-sm btn-outline-secondary"
@@ -223,7 +227,7 @@ function PaymentHistory() {
                     fetchPayments(page + 1);
                   }}
                 >
-                  Next
+                  {t("common.next")}
                 </button>
               </div>
             </div>

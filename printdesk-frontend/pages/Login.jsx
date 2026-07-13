@@ -1,11 +1,14 @@
 import { useState } from "react";
 import API from "../services/api";
 import { useNavigate, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import billoraLogo from "../src/assets/billora.png";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -19,7 +22,7 @@ function Login() {
       localStorage.setItem("role", res.data.role);
       navigate(res.data.role === "admin" ? "/admin-dashboard" : "/dashboard");
     } catch (err) {
-      alert(err.response?.data?.message || "Login failed");
+      alert(err.response?.data?.message || t("login.error"));
     }
   };
 
@@ -38,24 +41,31 @@ function Login() {
               }}
             />
           </div>
-          <div className="brand-title fs-3 mb-1">Welcome back</div>
-          <p className="text-soft mb-0 small">Login to manage invoices and revenue.</p>
+          <div className="brand-title fs-3 mb-1">{t("login.title")}</div>
+          <p className="text-soft mb-0 small">{t("login.subtitle")}</p>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="form-floating mb-3">
             <input type="email" name="email" className="form-control" id="floatingEmail" placeholder="name@example.com" onChange={handleChange} required />
-            <label htmlFor="floatingEmail">Email address</label>
+            <label htmlFor="floatingEmail">{t("login.email")}</label>
           </div>
           <div className="form-floating mb-4">
             <input type="password" name="password" className="form-control" id="floatingPassword" placeholder="Password" onChange={handleChange} required />
-            <label htmlFor="floatingPassword">Password</label>
+            <label htmlFor="floatingPassword">{t("login.password")}</label>
           </div>
-          <button className="btn btn-primary w-100 mb-3 py-2">Login</button>
+          <div className="d-flex justify-content-end mb-3">
+            <Link to="/forgot-password" className="text-decoration-none small">{t("login.forgotPassword")}</Link>
+          </div>
+          <button className="btn btn-primary w-100 mb-3 py-2">{t("login.submit")}</button>
         </form>
 
+        <div className="d-flex justify-content-center mb-2">
+          <LanguageSwitcher />
+        </div>
+
         <p className="mt-3 text-center small mb-0">
-          Don't have an account? <Link to="/register">Create one</Link>
+          {t("login.noAccount")} <Link to="/register">{t("login.createOne")}</Link>
         </p>
       </div>
     </div>
