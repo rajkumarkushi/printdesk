@@ -21,7 +21,18 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const allowed = [".png", ".jpg", ".jpeg"];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PNG and JPG logos are supported"));
+    }
+  },
+});
 
 router.get("/profile", protect, getProfile);
 router.put("/profile", protect, updateProfile);

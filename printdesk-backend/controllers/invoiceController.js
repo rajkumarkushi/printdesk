@@ -79,10 +79,33 @@ exports.createInvoice = async (req, res) => {
       });
     }
 
+    if (!customerName || !customerName.trim()) {
+      return res.status(400).json({ message: "Customer name is required" });
+    }
+    if (!customerPhone || !customerPhone.trim()) {
+      return res.status(400).json({ message: "Customer phone number is required" });
+    }
+
     if (!items || items.length === 0) {
       return res.status(400).json({
         message: "At least one item is required",
       });
+    }
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!item.itemType || !item.itemType.trim()) {
+        return res.status(400).json({ message: `Item type is required for item ${i + 1}` });
+      }
+      if (!item.designName || !item.designName.trim()) {
+        return res.status(400).json({ message: `Design name is required for item ${i + 1}` });
+      }
+      if (!item.quantity || Number(item.quantity) <= 0) {
+        return res.status(400).json({ message: `Valid quantity is required for item ${i + 1}` });
+      }
+      if (!item.price || Number(item.price) <= 0) {
+        return res.status(400).json({ message: `Valid price is required for item ${i + 1}` });
+      }
     }
 
     const totals = calculateInvoiceTotals(items, gstPercent, discount);
@@ -248,10 +271,33 @@ exports.updateInvoice = async (req, res) => {
       return res.status(404).json({ message: "Invoice not found" });
     }
 
+    if (!customerName || !customerName.trim()) {
+      return res.status(400).json({ message: "Customer name is required" });
+    }
+    if (!customerPhone || !customerPhone.trim()) {
+      return res.status(400).json({ message: "Customer phone number is required" });
+    }
+
     if (!items || items.length === 0) {
       return res.status(400).json({
         message: "At least one item is required",
       });
+    }
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!item.itemType || !item.itemType.trim()) {
+        return res.status(400).json({ message: `Item type is required for item ${i + 1}` });
+      }
+      if (!item.designName || !item.designName.trim()) {
+        return res.status(400).json({ message: `Design name is required for item ${i + 1}` });
+      }
+      if (!item.quantity || Number(item.quantity) <= 0) {
+        return res.status(400).json({ message: `Valid quantity is required for item ${i + 1}` });
+      }
+      if (!item.price || Number(item.price) <= 0) {
+        return res.status(400).json({ message: `Valid price is required for item ${i + 1}` });
+      }
     }
 
     const totals = calculateInvoiceTotals(items, gstPercent, discount);

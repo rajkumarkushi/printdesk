@@ -136,7 +136,7 @@ function BusinessProfile() {
         {logoUrl && (
           <div className="mb-3">
             <img
-              src={`http://localhost:5000${logoUrl}`}
+              src={`${import.meta.env.VITE_API_URL?.replace("/api", "")}${logoUrl}`}
               alt="Business Logo"
               style={{ maxHeight: "80px" }}
             />
@@ -146,7 +146,7 @@ function BusinessProfile() {
         <form onSubmit={handleLogoUpload}>
           <input
             type="file"
-            accept="image/*"
+            accept=".png,.jpg,.jpeg"
             className="form-control mb-3"
             onChange={handleLogoChange}
           />

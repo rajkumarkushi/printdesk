@@ -97,7 +97,7 @@ function UploadLogo() {
             type="file"
             id="logoInput"
             className="d-none"
-            accept="image/*"
+            accept=".png,.jpg,.jpeg"
             onChange={handleFileChange}
           />
           {preview ? (

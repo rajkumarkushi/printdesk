@@ -55,6 +55,35 @@ function EditInvoice() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!customerName.trim()) {
+      alert("Please enter customer name");
+      return;
+    }
+    if (!customerPhone.trim()) {
+      alert("Please enter customer phone number");
+      return;
+    }
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!item.itemType.trim()) {
+        alert(`Please enter item type for item ${i + 1}`);
+        return;
+      }
+      if (!item.designName.trim()) {
+        alert(`Please enter design name for item ${i + 1}`);
+        return;
+      }
+      if (!item.quantity || Number(item.quantity) <= 0) {
+        alert(`Please enter a valid quantity for item ${i + 1}`);
+        return;
+      }
+      if (!item.price || Number(item.price) <= 0) {
+        alert(`Please enter a valid price for item ${i + 1}`);
+        return;
+      }
+    }
+
     try {
       await API.put(`/invoices/${id}`, {
         customerName,
@@ -110,6 +139,7 @@ function EditInvoice() {
                 placeholder="Customer Phone"
                 value={customerPhone}
                 onChange={(e) => setCustomerPhone(e.target.value)}
+                required
               />
             </div>
             <div className="col-md-4">
@@ -157,6 +187,7 @@ function EditInvoice() {
                   placeholder="Design Name"
                   value={item.designName}
                   onChange={(e) => handleItemChange(index, e)}
+                  required
                 />
               </div>
               <div className="col-md-2">

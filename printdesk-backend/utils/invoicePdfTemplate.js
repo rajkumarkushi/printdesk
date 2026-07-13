@@ -121,8 +121,10 @@ async function generateInvoicePdf(doc, invoice, business) {
     const logoSize = 34;
     try {
       doc.image(logoPath, (PAGE_WIDTH_PT - logoSize) / 2, y, { width: logoSize, height: logoSize });
-    } catch (_) {}
-    y += logoSize + 6;
+      y += logoSize + 6;
+    } catch (err) {
+      console.error("Logo render failed:", err.message, "Path:", logoPath);
+    }
   }
 
   // Business name – always at readable size, wraps freely, tracked via doc.y
@@ -238,12 +240,13 @@ async function generateInvoicePdf(doc, invoice, business) {
   y += 10;
 
   // ─────────────────────────────────────────────────────────────────────────
-  // DETAILS BOX  – Receipt No / Customer / Payment Mode / Phone
+  // DETAILS BOX  – Receipt No / Customer (+ Payment Mode / Phone when paid)
   // ─────────────────────────────────────────────────────────────────────────
+  const isPaid = invoice.status === "Paid";
   const BP = 9;                                        // inner padding
-  const colInnerW = (CONTENT_W - BP * 3) / 2;
-  const leftColX  = MARGIN + BP;
-  const rightColX = MARGIN + BP * 2 + colInnerW;
+  const colInnerW = (CONTENT_W - BP * 5) / 2;
+  const leftColX  = MARGIN + BP * 3;
+  const rightColX = MARGIN + BP * 4 + colInnerW;
 
   const LABEL_H  = 9;   // height of the small label line
   const LABEL_GAP = 2;  // gap between label and value
@@ -253,15 +256,23 @@ async function generateInvoicePdf(doc, invoice, business) {
   doc.font("Helvetica-Bold").fontSize(9);
   const invNumH  = doc.heightOfString(invoice.invoiceNumber || "-", { width: colInnerW });
   const custNameH = doc.heightOfString(invoice.customerName  || "-", { width: colInnerW });
-  const payMode   = (invoice.paymentMode || "CASH").toUpperCase();
-  const payModeH  = doc.heightOfString(payMode,                  { width: colInnerW });
-  const formattedPhone = formatPhone(invoice.customerPhone);
-  const phoneH    = doc.heightOfString(formattedPhone, { width: colInnerW });
 
-  // Row heights: each row = label + gap + max(left value height, right value height)
-  const row1H = LABEL_H + LABEL_GAP + Math.max(invNumH,  custNameH);
-  const row2H = LABEL_H + LABEL_GAP + Math.max(payModeH, phoneH);
-  const actualBoxH = BP + row1H + ROW_GAP + row2H + BP;
+  // Row 1: always shown (Receipt No / Customer)
+  const row1H = LABEL_H + LABEL_GAP + Math.max(invNumH, custNameH);
+
+  // Row 2: only when paid (Payment Mode / Phone)
+  let row2H = 0;
+  let payMode = "";
+  let formattedPhone = "";
+  if (isPaid) {
+    payMode = (invoice.paymentMode || "CASH").toUpperCase();
+    const payModeH = doc.heightOfString(payMode, { width: colInnerW });
+    formattedPhone = formatPhone(invoice.customerPhone);
+    const phoneH = doc.heightOfString(formattedPhone, { width: colInnerW });
+    row2H = LABEL_H + LABEL_GAP + Math.max(payModeH, phoneH);
+  }
+
+  const actualBoxH = isPaid ? BP + row1H + ROW_GAP + row2H + BP : BP + row1H + BP;
 
   filledRect(doc, MARGIN, y, CONTENT_W, actualBoxH, 5, LIGHT_BG);
 
@@ -280,17 +291,20 @@ async function generateInvoicePdf(doc, invoice, business) {
   doc.font("Helvetica-Bold").fontSize(9).fillColor(TEXT);
   doc.text(invoice.customerName || "-", rightColX, bY + LABEL_H + LABEL_GAP, { width: colInnerW });
 
-  // ── Left column: Payment Mode ──
-  doc.font("Helvetica-Bold").fontSize(6.5).fillColor(ACCENT);
-  doc.text("PAYMENT MODE", leftColX, row2Y, { width: colInnerW, lineBreak: false, characterSpacing: 0.3 });
-  doc.font("Helvetica-Bold").fontSize(9).fillColor(TEXT);
-  doc.text(payMode, leftColX, row2Y + LABEL_H + LABEL_GAP, { width: colInnerW, lineBreak: false });
+  // ── Row 2: Payment Mode & Phone (only when paid) ──
+  if (isPaid) {
+    // ── Left column: Payment Mode ──
+    doc.font("Helvetica-Bold").fontSize(6.5).fillColor(ACCENT);
+    doc.text("PAYMENT MODE", leftColX, row2Y, { width: colInnerW, lineBreak: false, characterSpacing: 0.3 });
+    doc.font("Helvetica-Bold").fontSize(9).fillColor(TEXT);
+    doc.text(payMode, leftColX, row2Y + LABEL_H + LABEL_GAP, { width: colInnerW, lineBreak: false });
 
-  // ── Right column: Phone ──
-  doc.font("Helvetica-Bold").fontSize(6.5).fillColor(ACCENT);
-  doc.text("PHONE", rightColX, row2Y, { width: colInnerW, lineBreak: false, characterSpacing: 0.3 });
-  doc.font("Helvetica-Bold").fontSize(9).fillColor(TEXT);
-  doc.text(formattedPhone, rightColX, row2Y + LABEL_H + LABEL_GAP, { width: colInnerW, lineBreak: false });
+    // ── Right column: Phone ──
+    doc.font("Helvetica-Bold").fontSize(6.5).fillColor(ACCENT);
+    doc.text("PHONE", rightColX, row2Y, { width: colInnerW, lineBreak: false, characterSpacing: 0.3 });
+    doc.font("Helvetica-Bold").fontSize(9).fillColor(TEXT);
+    doc.text(formattedPhone, rightColX, row2Y + LABEL_H + LABEL_GAP, { width: colInnerW, lineBreak: false });
+  }
 
   y += actualBoxH + 12;
 

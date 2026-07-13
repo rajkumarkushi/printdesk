@@ -26,7 +26,18 @@ const storage = multer.diskStorage({
     cb(null, `reg-${req.params.id}-${Date.now()}${ext}`);
   },
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const allowed = [".png", ".jpg", ".jpeg"];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PNG and JPG logos are supported"));
+    }
+  },
+});
 
 router.post("/register", register);
 router.post("/login", login);
