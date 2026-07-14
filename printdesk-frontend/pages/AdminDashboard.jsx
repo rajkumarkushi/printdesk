@@ -553,7 +553,7 @@ function AdminDashboard() {
                   <th>{t("admin.plan")}</th>
                   <th>{t("admin.invoiceLimit")}</th>
                   <th>{t("admin.created")}</th>
-                  <th className="text-end" style={{ minWidth: 240 }}>{t("admin.actions")}</th>
+                  <th className="text-center">{t("admin.actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -605,8 +605,8 @@ function AdminDashboard() {
                           ? new Date(user.createdAt).toLocaleDateString()
                           : "-"}
                       </td>
-                      <td>
-                        <div className="d-flex flex-wrap gap-2 justify-content-end">
+                      <td className="text-center">
+                        <div className="d-flex flex-wrap gap-2 justify-content-center">
                           <button
                             className="btn btn-sm btn-outline-success"
                             onClick={() => handleDownloadUserSummaryPdf(user)}

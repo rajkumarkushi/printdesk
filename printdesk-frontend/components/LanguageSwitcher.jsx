@@ -48,7 +48,7 @@ function LanguageSwitcher() {
           cursor: "pointer",
         }}
       >
-        <span style={{ fontSize: "1rem" }}>{currentLang.flag}</span>
+        <span style={{ fontSize: "0.8rem" }}>Languages</span>
         <span style={{ fontSize: "0.75rem", opacity: 0.6 }}>&#9662;</span>
       </button>
 

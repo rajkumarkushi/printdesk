@@ -511,11 +511,9 @@ function Dashboard() {
                   }}
                 />
               </div>
-              <div>
-                <label className="form-label small text-soft">&nbsp;</label>
-                <div>
-                  <span className="badge-plan">{total} {t("common.total")}</span>
-                </div>
+              <div style={{ paddingBottom: 2 }}>
+                <label className="form-label small text-soft" style={{ visibility: "hidden" }}>x</label>
+                <span className="badge-plan">{total} {t("common.total")}</span>
               </div>
             </div>
           </div>
@@ -528,7 +526,7 @@ function Dashboard() {
                   <th>{t("dashboard.items")}</th>
                   <th>{t("dashboard.amount")}</th>
                   <th>{t("dashboard.statusLabel")}</th>
-                  <th className="text-end">{t("dashboard.actions")}</th>
+                  <th className="text-center">{t("dashboard.actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -561,8 +559,8 @@ function Dashboard() {
                         {inv.status || t("common.unpaid")}
                       </span>
                     </td>
-                    <td>
-                      <div className="d-flex flex-wrap gap-2 justify-content-end">
+                    <td className="text-center">
+                      <div className="d-flex flex-wrap gap-2 justify-content-center">
                         {inv.status !== "Paid" && (
                           <button
                             className="btn btn-sm btn-success"
