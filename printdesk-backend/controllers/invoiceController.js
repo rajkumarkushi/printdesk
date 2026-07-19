@@ -4,6 +4,8 @@ const Invoice = require("../models/Invoice");
 const PDFDocument = require("pdfkit");
 const QRCode = require("qrcode");
 const { generateInvoicePdf, PAGE_WIDTH_PT } = require("../utils/invoicePdfTemplate");
+const { validateInvoiceFields, getStartOfMonth, checkInvoiceLimit } = require("../utils/invoiceHelpers");
+const { parsePagination } = require("../utils/pagination");
 
 // ===============================
 // COMMON CALCULATION FUNCTION
@@ -50,62 +52,14 @@ exports.createInvoice = async (req, res) => {
     const { customerName, customerPhone, items, gstPercent, discount } = req.body;
     const business = req.user;
 
-    let limitForCheck;
-    const overrideLimit =
-      typeof business.invoiceLimit === "number" ? business.invoiceLimit : null;
-
-    if (business.plan === "free") {
-      limitForCheck = overrideLimit ?? 30;
-    } else if (business.plan === "basic") {
-      limitForCheck = overrideLimit ?? 200;
-    } else if (business.plan === "pro") {
-      limitForCheck = overrideLimit ?? Number.MAX_SAFE_INTEGER;
-    } else {
-      limitForCheck = overrideLimit ?? 30;
+    const limitError = await checkInvoiceLimit(business);
+    if (limitError) {
+      return res.status(403).json({ message: limitError });
     }
 
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
-    const invoiceCount = await Invoice.countDocuments({
-      businessId: business._id,
-      createdAt: { $gte: startOfMonth },
-    });
-
-    if (invoiceCount >= limitForCheck) {
-      return res.status(403).json({
-        message: "Invoice limit reached for this account.",
-      });
-    }
-
-    if (!customerName || !customerName.trim()) {
-      return res.status(400).json({ message: "Customer name is required" });
-    }
-    if (!customerPhone || !customerPhone.trim()) {
-      return res.status(400).json({ message: "Customer phone number is required" });
-    }
-
-    if (!items || items.length === 0) {
-      return res.status(400).json({
-        message: "At least one item is required",
-      });
-    }
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (!item.itemType || !item.itemType.trim()) {
-        return res.status(400).json({ message: `Item type is required for item ${i + 1}` });
-      }
-      if (!item.designName || !item.designName.trim()) {
-        return res.status(400).json({ message: `Design name is required for item ${i + 1}` });
-      }
-      if (!item.quantity || Number(item.quantity) <= 0) {
-        return res.status(400).json({ message: `Valid quantity is required for item ${i + 1}` });
-      }
-      if (!item.price || Number(item.price) <= 0) {
-        return res.status(400).json({ message: `Valid price is required for item ${i + 1}` });
-      }
+    const validationError = validateInvoiceFields(customerName, customerPhone, items);
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
     }
 
     const totals = calculateInvoiceTotals(items, gstPercent, discount);
@@ -137,15 +91,12 @@ exports.createInvoice = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
-
 // ======================================
 // GET ALL INVOICES (paginated)
 // ======================================
 exports.getInvoices = async (req, res) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = parsePagination(req.query);
 
     const filter = { businessId: req.user._id, isDeleted: false };
 
@@ -196,35 +147,48 @@ exports.getUsage = async (req, res) => {
   try {
     const business = req.user;
 
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
+    const startOfMonth = getStartOfMonth();
 
     const used = await Invoice.countDocuments({
       businessId: business._id,
       createdAt: { $gte: startOfMonth },
     });
 
+    // Pro plan = always unlimited
+    if (business.plan === "pro") {
+      return res.json({
+        plan: business.plan,
+        used,
+        limit: null,
+        remaining: null,
+      });
+    }
+
     const overrideLimit =
       typeof business.invoiceLimit === "number" ? business.invoiceLimit : null;
 
-    let limitForApi;
-
+    // Free plan: lifetime usage (no monthly reset)
     if (business.plan === "free") {
-      limitForApi = overrideLimit ?? 30;
-    } else if (business.plan === "basic") {
-      limitForApi = overrideLimit ?? 200;
-    } else if (business.plan === "pro") {
-      limitForApi = overrideLimit ?? null;
-    } else {
-      limitForApi = overrideLimit ?? 30;
+      const totalUsed = await Invoice.countDocuments({
+        businessId: business._id,
+      });
+      const limitForApi = overrideLimit ?? 30;
+      return res.json({
+        plan: business.plan,
+        used: totalUsed,
+        limit: limitForApi,
+        remaining: Math.max(limitForApi - totalUsed, 0),
+      });
     }
+
+    // Basic plan: monthly usage (resets every month)
+    const limitForApi = overrideLimit ?? 200;
 
     res.json({
       plan: business.plan,
       used,
       limit: limitForApi,
-      remaining: limitForApi === null ? null : Math.max(limitForApi - used, 0),
+      remaining: Math.max(limitForApi - used, 0),
     });
   } catch (error) {
     console.log("USAGE ERROR:", error);
@@ -271,33 +235,9 @@ exports.updateInvoice = async (req, res) => {
       return res.status(404).json({ message: "Invoice not found" });
     }
 
-    if (!customerName || !customerName.trim()) {
-      return res.status(400).json({ message: "Customer name is required" });
-    }
-    if (!customerPhone || !customerPhone.trim()) {
-      return res.status(400).json({ message: "Customer phone number is required" });
-    }
-
-    if (!items || items.length === 0) {
-      return res.status(400).json({
-        message: "At least one item is required",
-      });
-    }
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (!item.itemType || !item.itemType.trim()) {
-        return res.status(400).json({ message: `Item type is required for item ${i + 1}` });
-      }
-      if (!item.designName || !item.designName.trim()) {
-        return res.status(400).json({ message: `Design name is required for item ${i + 1}` });
-      }
-      if (!item.quantity || Number(item.quantity) <= 0) {
-        return res.status(400).json({ message: `Valid quantity is required for item ${i + 1}` });
-      }
-      if (!item.price || Number(item.price) <= 0) {
-        return res.status(400).json({ message: `Valid price is required for item ${i + 1}` });
-      }
+    const validationError = validateInvoiceFields(customerName, customerPhone, items);
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
     }
 
     const totals = calculateInvoiceTotals(items, gstPercent, discount);

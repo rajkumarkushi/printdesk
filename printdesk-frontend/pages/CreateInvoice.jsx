@@ -1,39 +1,28 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
-import ThemeToggle from "../src/components/ThemeToggle";
-import LanguageSwitcher from "../components/LanguageSwitcher";
+import useInvoiceForm from "../hooks/useInvoiceForm";
+import useProfile from "../hooks/useProfile";
+import { openRazorpayCheckout } from "../services/razorpay";
+import InvoiceFormHeader from "../components/InvoiceFormHeader";
+import InvoiceItemRows from "../components/InvoiceItemRows";
+import InvoiceSummary from "../components/InvoiceSummary";
 
 function CreateInvoice() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const profile = useProfile();
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [items, setItems] = useState([{ itemType: "", designName: "", quantity: 1, price: 0 }]);
-  const [gstPercent, setGstPercent] = useState(18);
-  const [discount, setDiscount] = useState(0);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [limitMessage, setLimitMessage] = useState("");
 
-  const handleItemChange = (index, e) => {
-    const newItems = [...items];
-    newItems[index][e.target.name] = e.target.value;
-    setItems(newItems);
-  };
-
-  const addItem = () => setItems([...items, { itemType: "", designName: "", quantity: 1, price: 0 }]);
-  const removeItem = (index) => setItems(items.filter((_, i) => i !== index));
-  const subtotal = items.reduce(
-    (acc, item) => acc + Number(item.quantity) * Number(item.price),
-    0
-  );
-
-  const gstAmount = Math.round((subtotal * Number(gstPercent)) / 100);
-  const discountAmount = Math.round((subtotal * Number(discount || 0)) / 100);
-
-  const totalAmount = Math.max(
-    0,
-    subtotal + gstAmount - discountAmount
-  );
+  const {
+    items, gstPercent, setGstPercent, discount, setDiscount,
+    handleItemChange, addItem, removeItem,
+    subtotal, gstAmount, discountAmount, totalAmount, validate,
+  } = useInvoiceForm();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -46,24 +35,11 @@ function CreateInvoice() {
       alert(t("createInvoice.errPhone"));
       return;
     }
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (!item.itemType.trim()) {
-        alert(t("createInvoice.errItemType", { num: i + 1 }));
-        return;
-      }
-      if (!item.designName.trim()) {
-        alert(t("createInvoice.errDesign", { num: i + 1 }));
-        return;
-      }
-      if (!item.quantity || Number(item.quantity) <= 0) {
-        alert(t("createInvoice.errQty", { num: i + 1 }));
-        return;
-      }
-      if (!item.price || Number(item.price) <= 0) {
-        alert(t("createInvoice.errPrice", { num: i + 1 }));
-        return;
-      }
+
+    const itemError = validate(t);
+    if (itemError) {
+      alert(itemError);
+      return;
     }
 
     try {
@@ -78,30 +54,24 @@ function CreateInvoice() {
       alert(t("createInvoice.success"));
       navigate("/dashboard");
     } catch (error) {
-      alert(error.response?.data?.message || t("createInvoice.errCreate"));
+      const msg = error.response?.data?.message || t("createInvoice.errCreate");
+      if (error.response?.status === 403) {
+        setLimitMessage(msg);
+        setShowUpgrade(true);
+      } else {
+        alert(msg);
+      }
     }
   };
 
   return (
     <div className="invoice-page">
       <div className="invoice-form-card bg-white p-4 p-md-5">
-          <div className="d-flex justify-content-between align-items-center mb-4">
-          <div>
-            <p className="metric-label mb-1">{t("createInvoice.metric")}</p>
-            <h3 className="fw-bold mb-0">{t("createInvoice.title")}</h3>
-          </div>
-          <div className="d-flex gap-2">
-            <ThemeToggle />
-            <LanguageSwitcher />
-            <button
-              type="button"
-              className="btn btn-outline-secondary btn-sm"
-              onClick={() => navigate(-1)}
-            >
-              &times; {t("close")}
-            </button>
-          </div>
-        </div>
+        <InvoiceFormHeader
+          metric={t("createInvoice.metric")}
+          title={t("createInvoice.title")}
+          onClose={() => navigate(-1)}
+        />
 
         <form onSubmit={handleSubmit}>
           <div className="row g-3 mb-4">
@@ -127,146 +97,51 @@ function CreateInvoice() {
             </div>
           </div>
 
-          <div className="d-flex justify-content-between align-items-center mb-4">
-            <h5 className="fw-bold mb-0">{t("createInvoice.items")}</h5>
-            <button
-              type="button"
-              className="btn btn-outline-secondary btn-sm"
-              onClick={addItem}
-            >
-              {t("createInvoice.addItem")}
-            </button>
-          </div>
+          <InvoiceItemRows
+            items={items}
+            onItemChange={handleItemChange}
+            onAdd={addItem}
+            onRemove={removeItem}
+          />
 
-          {items.map((item, index) => (
-            <div key={index} className="item-row row g-3 align-items-end mb-3">
-              <div className="col-md-3">
-                <label className="form-label">{t("createInvoice.itemType")}</label>
-                <input
-                  name="itemType"
-                  className="form-control"
-                  placeholder={t("createInvoice.itemTypePlaceholder")}
-                  value={item.itemType}
-                  onChange={(e) => handleItemChange(index, e)}
-                  required
-                />
-              </div>
-              <div className="col-md-3">
-                <label className="form-label">{t("createInvoice.designName")}</label>
-                <input
-                  name="designName"
-                  className="form-control"
-                  placeholder={t("createInvoice.designNamePlaceholder")}
-                  value={item.designName}
-                  onChange={(e) => handleItemChange(index, e)}
-                  required
-                />
-              </div>
-              <div className="col-md-2">
-                <label className="form-label">{t("createInvoice.qty")}</label>
-                <input
-                  name="quantity"
-                  type="number"
-                  className="form-control"
-                  placeholder="1"
-                  value={item.quantity}
-                  onChange={(e) => handleItemChange(index, e)}
-                  required
-                />
-              </div>
-              <div className="col-md-2">
-                <label className="form-label">{t("createInvoice.price")}</label>
-                <input
-                  name="price"
-                  type="number"
-                  className="form-control"
-                  placeholder="0"
-                  value={item.price}
-                  onChange={(e) => handleItemChange(index, e)}
-                  required
-                />
-              </div>
-              <div className="col-md-2">
-                <button
-                  type="button"
-                  className="btn btn-outline-danger w-100"
-                  onClick={() => removeItem(index)}
-                  disabled={items.length === 1}
-                >
-                  {t("createInvoice.remove")}
-                </button>
-              </div>
-            </div>
-          ))}
-
-          <div className="summary-card p-4 mt-4">
-            <h6 className="fw-bold mb-3">{t("createInvoice.summary")}</h6>
-            <div className="row g-3 mb-3">
-              <div className="col-md-6">
-                <label className="form-label">{t("createInvoice.gstRate")}</label>
-                <select
-                  className="form-select"
-                  value={gstPercent}
-                  onChange={(e) => setGstPercent(Number(e.target.value))}
-                >
-                  <option value={0}>GST 0%</option>
-                  <option value={5}>GST 5%</option>
-                  <option value={12}>GST 12%</option>
-                  <option value={18}>GST 18%</option>
-                  <option value={28}>GST 28%</option>
-                </select>
-              </div>
-              <div className="col-md-6">
-                <label className="form-label">{t("createInvoice.discount")}</label>
-                <input
-                  type="number"
-                  className="form-control"
-                  placeholder={t("createInvoice.discountPlaceholder")}
-                  value={discount}
-                  onChange={(e) => setDiscount(Number(e.target.value))}
-                />
-              </div>
-            </div>
-
-            <div
-              className="p-3 mt-2"
-              style={{
-                borderRadius: "var(--radius)",
-                background: "linear-gradient(135deg, rgba(79, 70, 229, 0.04), rgba(6, 182, 212, 0.04))",
-                border: "1px solid var(--line)",
-              }}
-            >
-              <div className="d-flex justify-content-between mb-2">
-                <span className="text-soft">{t("createInvoice.subtotal")}</span>
-                <span className="fw-semibold">&#8377;{subtotal.toLocaleString("en-IN")}</span>
-              </div>
-              <div className="d-flex justify-content-between mb-2">
-                <span className="text-soft">{t("createInvoice.gst", { percent: gstPercent })}</span>
-                <span className="fw-semibold">&#8377;{gstAmount.toLocaleString("en-IN")}</span>
-              </div>
-              {discount > 0 && (
-                <div className="d-flex justify-content-between mb-3">
-                  <span className="text-soft">{t("createInvoice.discountLabel", { percent: discount })}</span>
-                  <span className="fw-semibold">&#8377;{discountAmount.toLocaleString("en-IN")}</span>
-                </div>
-              )}
-              <div
-                className="d-flex justify-content-between pt-3"
-                style={{ borderTop: "2px solid var(--line)" }}
-              >
-                <span className="metric-label mb-0">{t("createInvoice.total")}</span>
-                <h4 className="fw-bold mb-0" style={{ color: "var(--brand)" }}>
-                  &#8377;{totalAmount.toLocaleString("en-IN")}
-                </h4>
-              </div>
-            </div>
-          </div>
+          <InvoiceSummary
+            gstPercent={gstPercent}
+            setGstPercent={setGstPercent}
+            discount={discount}
+            setDiscount={setDiscount}
+            subtotal={subtotal}
+            gstAmount={gstAmount}
+            discountAmount={discountAmount}
+            totalAmount={totalAmount}
+          />
 
           <button className="btn btn-primary mt-4 px-5 py-2">
             {t("createInvoice.submit")}
           </button>
         </form>
       </div>
+
+      {showUpgrade && (
+        <div className="modal d-block" tabIndex="-1" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content p-4">
+              <h5 className="fw-bold mb-2">{t("createInvoice.upgradeTitle")}</h5>
+              <p className="text-soft mb-4">{limitMessage}</p>
+              <div className="d-flex flex-column gap-3">
+                <button className="btn btn-outline-warning w-100 py-2" onClick={() => openRazorpayCheckout({ plan: "basic", profile, t })}>
+                  {t("dashboard.basicPlan")}
+                </button>
+                <button className="btn btn-warning w-100 py-2" onClick={() => openRazorpayCheckout({ plan: "pro", profile, t })}>
+                  {t("dashboard.proPlan")}
+                </button>
+                <button className="btn btn-outline-secondary w-100" onClick={() => setShowUpgrade(false)}>
+                  {t("close")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

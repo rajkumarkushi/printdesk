@@ -5,6 +5,9 @@ import API from "../services/api";
 import billoraLogo from "../src/assets/billora.png";
 import ThemeToggle from "../src/components/ThemeToggle";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import useProfile from "../hooks/useProfile";
+import useAuth from "../hooks/useAuth";
+import Pagination from "../components/Pagination";
 
 function PaymentHistory() {
   const [payments, setPayments] = useState([]);
@@ -13,10 +16,11 @@ function PaymentHistory() {
   const [total, setTotal] = useState(0);
   const [typeFilter, setTypeFilter] = useState("all");
   const [fadeKey, setFadeKey] = useState(0);
-  const [profile, setProfile] = useState(null);
   const limit = 10;
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const profile = useProfile();
+  const { logout: handleLogout } = useAuth();
 
   const fetchPayments = async (currentPage = page, type = typeFilter) => {
     const params = new URLSearchParams({ page: currentPage, limit });
@@ -27,24 +31,9 @@ function PaymentHistory() {
     setTotal(res.data.total);
   };
 
-  const fetchProfile = async () => {
-    try {
-      const res = await API.get("/business/profile");
-      setProfile(res.data);
-    } catch (error) {
-      console.error("Failed to load business profile", error);
-    }
-  };
-
   useEffect(() => {
     fetchPayments(1);
-    fetchProfile();
   }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    navigate("/login");
-  };
 
   const formatAmount = (amount) => {
     return "\u20B9" + Number(amount).toLocaleString("en-IN");
@@ -203,35 +192,11 @@ function PaymentHistory() {
               </tbody>
             </table>
           </div>
-          {totalPages > 1 && (
-            <div className="d-flex justify-content-between align-items-center px-4 py-3 border-top">
-              <small className="text-soft">
-                {t("common.page")} {page} {t("common.of")} {totalPages}
-              </small>
-              <div className="d-flex gap-2">
-                <button
-                  className="btn btn-sm btn-outline-secondary"
-                  disabled={page === 1}
-                  onClick={() => {
-                    setPage(page - 1);
-                    fetchPayments(page - 1);
-                  }}
-                >
-                  {t("common.previous")}
-                </button>
-                <button
-                  className="btn btn-sm btn-outline-secondary"
-                  disabled={page === totalPages}
-                  onClick={() => {
-                    setPage(page + 1);
-                    fetchPayments(page + 1);
-                  }}
-                >
-                  {t("common.next")}
-                </button>
-              </div>
-            </div>
-          )}
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={(p) => { setPage(p); fetchPayments(p); }}
+          />
           </div>
         </div>
       </main>

@@ -6,6 +6,7 @@ const Business = require("../models/Business");
 const Invoice = require("../models/Invoice");
 const Payment = require("../models/Payment");
 const { generateInvoicePdf, PAGE_WIDTH_PT } = require("../utils/invoicePdfTemplate");
+const { parsePagination } = require("../utils/pagination");
 
 // =====================
 // GET ADMIN STATS
@@ -54,9 +55,7 @@ exports.getAdminStats = async (req, res) => {
 // =====================
 exports.getAllUsers = async (req, res) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = parsePagination(req.query);
 
     const baseUserQuery = {
       $or: [{ role: "user" }, { role: { $exists: false } }],
@@ -162,9 +161,7 @@ exports.deleteUser = async (req, res) => {
 // =====================
 exports.getUserInvoices = async (req, res) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = parsePagination(req.query);
 
     const filter = { businessId: req.params.id, isDeleted: false };
 
@@ -838,9 +835,7 @@ exports.downloadUserPaymentsPdf = async (req, res) => {
 // =====================
 exports.getAllPayments = async (req, res) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = parsePagination(req.query);
 
     const activeInvoiceIds = await Invoice.find({ isDeleted: false }).distinct("_id");
 
@@ -886,9 +881,7 @@ exports.getAllPayments = async (req, res) => {
 // =====================
 exports.getUserPayments = async (req, res) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = parsePagination(req.query);
 
     const activeInvoiceIds = await Invoice.find({
       businessId: req.params.id,

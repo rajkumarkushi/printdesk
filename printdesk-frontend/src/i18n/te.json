@@ -192,6 +192,7 @@
   "createInvoice.errPrice": "దయచేసి ఐటెమ్ {{num}} కోసం చెల్లుబాటు అయ్యే ధర నమోదు చేయండి",
   "createInvoice.success": "ఇన్వాయిస్ సృష్టించబడింది",
   "createInvoice.errCreate": "ఇన్వాయిస్ సృష్టించడంలో లోపం",
+  "createInvoice.upgradeTitle": "మీ ప్లాన్‌ను అప్‌గ్రేడ్ చేయండి",
 
   "editInvoice.metric": "ఇన్వాయిస్ సవరించు",
   "editInvoice.title": "ఇన్వాయిస్ సవరించు",

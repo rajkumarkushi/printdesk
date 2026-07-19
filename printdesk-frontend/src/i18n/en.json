@@ -192,6 +192,7 @@
   "createInvoice.errPrice": "Please enter a valid price for item {{num}}",
   "createInvoice.success": "Invoice Created",
   "createInvoice.errCreate": "Error creating invoice",
+  "createInvoice.upgradeTitle": "Upgrade Your Plan",
 
   "editInvoice.metric": "Edit invoice",
   "editInvoice.title": "Edit Invoice",

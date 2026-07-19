@@ -192,6 +192,7 @@
   "createInvoice.errPrice": "कृपया आइटम {{num}} के लिए मान्य मूल्य दर्ज करें",
   "createInvoice.success": "चालान बनाया गया",
   "createInvoice.errCreate": "चालान बनाने में त्रुटि",
+  "createInvoice.upgradeTitle": "अपना प्लान अपग्रेड करें",
 
   "editInvoice.metric": "चालान संपादित करें",
   "editInvoice.title": "चालान संपादित करें",

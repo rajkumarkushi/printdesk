@@ -1,12 +1,8 @@
-const crypto = require("crypto");
-const axios = require("axios");
 const Business = require("../models/Business");
 const Invoice = require("../models/Invoice");
 const Payment = require("../models/Payment");
-
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
-const RAZORPAY_API = "https://api.razorpay.com/v1";
+const { verifyRazorpaySignature, createRazorpayOrder, RAZORPAY_KEY_ID } = require("../utils/razorpay");
+const { parsePagination } = require("../utils/pagination");
 
 const PLAN_PRICES = {
   basic: 19900,
@@ -26,33 +22,13 @@ exports.createOrder = async (req, res) => {
 
     const amount = PLAN_PRICES[plan];
 
-    const response = await axios.post(
-      `${RAZORPAY_API}/orders`,
-      {
-        amount,
-        currency: "INR",
-        receipt: `rcpt_${plan}_${Date.now().toString(36)}`,
-        notes: {
-          userId: req.user._id.toString(),
-          plan,
-        },
-      },
-      {
-        auth: {
-          username: RAZORPAY_KEY_ID,
-          password: RAZORPAY_KEY_SECRET,
-        },
-      }
-    );
-
-    const order = response.data;
-
-    res.json({
-      orderId: order.id,
-      amount: order.amount,
-      currency: order.currency,
-      keyId: RAZORPAY_KEY_ID,
+    const result = await createRazorpayOrder({
+      amount,
+      receipt: `rcpt_${plan}_${Date.now().toString(36)}`,
+      notes: { userId: req.user._id.toString(), plan },
     });
+
+    res.json(result);
   } catch (error) {
     console.log("CREATE ORDER ERROR:", error.response?.data || error.message);
     res.status(500).json({
@@ -73,14 +49,7 @@ exports.verifyPayment = async (req, res) => {
       return res.status(400).json({ message: "Missing payment details" });
     }
 
-    const body = razorpay_order_id + "|" + razorpay_payment_id;
-
-    const expectedSignature = crypto
-      .createHmac("sha256", RAZORPAY_KEY_SECRET)
-      .update(body)
-      .digest("hex");
-
-    if (expectedSignature !== razorpay_signature) {
+    if (!verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
       return res.status(400).json({ message: "Invalid payment signature" });
     }
 
@@ -142,35 +111,17 @@ exports.createInvoiceOrder = async (req, res) => {
 
     const amount = invoice.totalAmount * 100;
 
-    const response = await axios.post(
-      `${RAZORPAY_API}/orders`,
-      {
-        amount,
-        currency: "INR",
-        receipt: `rcpt_inv_${invoice.invoiceNumber}_${Date.now().toString(36)}`,
-        notes: {
-          userId: req.user._id.toString(),
-          invoiceId: invoice._id.toString(),
-          invoiceNumber: invoice.invoiceNumber,
-        },
+    const result = await createRazorpayOrder({
+      amount,
+      receipt: `rcpt_inv_${invoice.invoiceNumber}_${Date.now().toString(36)}`,
+      notes: {
+        userId: req.user._id.toString(),
+        invoiceId: invoice._id.toString(),
+        invoiceNumber: invoice.invoiceNumber,
       },
-      {
-        auth: {
-          username: RAZORPAY_KEY_ID,
-          password: RAZORPAY_KEY_SECRET,
-        },
-      }
-    );
-
-    const order = response.data;
-
-    res.json({
-      orderId: order.id,
-      amount: order.amount,
-      currency: order.currency,
-      keyId: RAZORPAY_KEY_ID,
-      invoiceNumber: invoice.invoiceNumber,
     });
+
+    res.json({ ...result, invoiceNumber: invoice.invoiceNumber });
   } catch (error) {
     console.log("CREATE INVOICE ORDER ERROR:", error.response?.data || error.message);
     res.status(500).json({
@@ -191,14 +142,7 @@ exports.verifyInvoicePayment = async (req, res) => {
       return res.status(400).json({ message: "Missing payment details" });
     }
 
-    const body = razorpay_order_id + "|" + razorpay_payment_id;
-
-    const expectedSignature = crypto
-      .createHmac("sha256", RAZORPAY_KEY_SECRET)
-      .update(body)
-      .digest("hex");
-
-    if (expectedSignature !== razorpay_signature) {
+    if (!verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
       return res.status(400).json({ message: "Invalid payment signature" });
     }
 
@@ -246,9 +190,7 @@ exports.verifyInvoicePayment = async (req, res) => {
 // =====================
 exports.getPaymentHistory = async (req, res) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = parsePagination(req.query);
 
     const filter = { businessId: req.user._id };
 

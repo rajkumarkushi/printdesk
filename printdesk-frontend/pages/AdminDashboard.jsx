@@ -5,6 +5,8 @@ import API from "../services/api";
 import billoraLogo from "../src/assets/billora.png";
 import ThemeToggle from "../src/components/ThemeToggle";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import { downloadBlob } from "../utils/downloadBlob";
+import Pagination from "../components/Pagination";
 
 function AdminDashboard() {
   const [stats, setStats] = useState({});
@@ -240,22 +242,8 @@ function AdminDashboard() {
 
   const handleDownloadInvoicePdf = async (user, invoiceId) => {
     try {
-      const response = await API.get(
-        `/admin/users/${user._id}/invoices/${invoiceId}/pdf`,
-        {
-          responseType: "blob",
-        }
-      );
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute(
-        "download",
-        `invoice-${invoiceId}-${user.businessName || "business"}.pdf`
-      );
-      document.body.appendChild(link);
-      link.click();
+      const response = await API.get(`/admin/users/${user._id}/invoices/${invoiceId}/pdf`, { responseType: "blob" });
+      downloadBlob(response, `invoice-${invoiceId}-${user.businessName || "business"}.pdf`);
     } catch (error) {
       alert("Failed to download invoice PDF");
     }
@@ -263,22 +251,8 @@ function AdminDashboard() {
 
   const handleDownloadUserSummaryPdf = async (user) => {
     try {
-      const response = await API.get(
-        `/admin/users/${user._id}/summary-pdf`,
-        {
-          responseType: "blob",
-        }
-      );
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute(
-        "download",
-        `user-summary-${user.businessName || "business"}.pdf`
-      );
-      document.body.appendChild(link);
-      link.click();
+      const response = await API.get(`/admin/users/${user._id}/summary-pdf`, { responseType: "blob" });
+      downloadBlob(response, `user-summary-${user.businessName || "business"}.pdf`);
     } catch (error) {
       alert("Failed to download user summary PDF");
     }
@@ -290,17 +264,7 @@ function AdminDashboard() {
         ? `/admin/users/${paymentsUserFilter}/payments-pdf`
         : `/admin/payments-all-pdf`;
       const response = await API.get(url, { responseType: "blob" });
-      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.setAttribute(
-        "download",
-        paymentsUserFilter
-          ? `payments-${paymentsUserFilter}.pdf`
-          : `all-payments.pdf`
-      );
-      document.body.appendChild(link);
-      link.click();
+      downloadBlob(response, paymentsUserFilter ? `payments-${paymentsUserFilter}.pdf` : `all-payments.pdf`);
     } catch (error) {
       alert("Failed to download payments PDF");
     }
@@ -308,16 +272,8 @@ function AdminDashboard() {
 
   const handleDownloadSinglePaymentPdf = async (paymentId) => {
     try {
-      const response = await API.get(
-        `/admin/payments/${paymentId}/pdf`,
-        { responseType: "blob" }
-      );
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `payment-${paymentId}.pdf`);
-      document.body.appendChild(link);
-      link.click();
+      const response = await API.get(`/admin/payments/${paymentId}/pdf`, { responseType: "blob" });
+      downloadBlob(response, `payment-${paymentId}.pdf`);
     } catch (error) {
       alert("Failed to download payment receipt");
     }
@@ -645,35 +601,14 @@ function AdminDashboard() {
               </tbody>
             </table>
           </div>
-          {usersTotalPages > 1 && (
-            <div className="d-flex justify-content-between align-items-center px-4 py-3 border-top">
-              <small className="text-soft">
-                {t("common.page")} {usersPage} {t("common.of")} {usersTotalPages}
-              </small>
-              <div className="d-flex gap-2">
-                <button
-                  className="btn btn-sm btn-outline-secondary"
-                  disabled={usersPage === 1}
-                  onClick={() => {
-                    setUsersPage(usersPage - 1);
-                    fetchUsers(usersPage - 1, searchTerm, selectedPlanFilter, startDate, endDate);
-                  }}
-                >
-                  {t("common.previous")}
-                </button>
-                <button
-                  className="btn btn-sm btn-outline-secondary"
-                  disabled={usersPage === usersTotalPages}
-                  onClick={() => {
-                    setUsersPage(usersPage + 1);
-                    fetchUsers(usersPage + 1, searchTerm, selectedPlanFilter, startDate, endDate);
-                  }}
-                >
-                  {t("common.next")}
-                </button>
-              </div>
-            </div>
-          )}
+          <Pagination
+            page={usersPage}
+            totalPages={usersTotalPages}
+            onPageChange={(p) => {
+              setUsersPage(p);
+              fetchUsers(p, searchTerm, selectedPlanFilter, startDate, endDate);
+            }}
+          />
         </div>
       </main>
 
@@ -859,33 +794,11 @@ function AdminDashboard() {
                         </tbody>
                       </table>
                     </div>
-                    {invoiceModalTotalPages > 1 && (
-                      <div className="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
-                        <small className="text-soft">
-                          {t("common.page")} {invoiceModalPage} {t("common.of")} {invoiceModalTotalPages} &middot; {invoiceModalTotal} {t("common.total")}
-                        </small>
-                        <div className="d-flex gap-2">
-                          <button
-                            className="btn btn-sm btn-outline-secondary"
-                            disabled={invoiceModalPage === 1}
-                            onClick={() =>
-                              openInvoicesModal(invoiceModalUser, invoiceModalPage - 1)
-                            }
-                          >
-                            {t("common.previous")}
-                          </button>
-                          <button
-                            className="btn btn-sm btn-outline-secondary"
-                            disabled={invoiceModalPage === invoiceModalTotalPages}
-                            onClick={() =>
-                              openInvoicesModal(invoiceModalUser, invoiceModalPage + 1)
-                            }
-                          >
-                            {t("common.next")}
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    <Pagination
+                      page={invoiceModalPage}
+                      totalPages={invoiceModalTotalPages}
+                      onPageChange={(p) => openInvoicesModal(invoiceModalUser, p)}
+                    />
                   </>
                 )}
               </div>
@@ -1015,35 +928,14 @@ function AdminDashboard() {
                         </tbody>
                       </table>
                     </div>
-                    {paymentsTotalPages > 1 && (
-                      <div className="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
-                        <small className="text-soft">
-                          {t("common.page")} {paymentsPage} {t("common.of")} {paymentsTotalPages} &middot; {paymentsTotal} {t("common.total")}
-                        </small>
-                        <div className="d-flex gap-2">
-                          <button
-                            className="btn btn-sm btn-outline-secondary"
-                            disabled={paymentsPage === 1}
-                            onClick={() => {
-                              setPaymentsPage(paymentsPage - 1);
-                              fetchPayments(paymentsPage - 1, paymentsTypeFilter, paymentsUserFilter);
-                            }}
-                          >
-                            {t("common.previous")}
-                          </button>
-                          <button
-                            className="btn btn-sm btn-outline-secondary"
-                            disabled={paymentsPage === paymentsTotalPages}
-                            onClick={() => {
-                              setPaymentsPage(paymentsPage + 1);
-                              fetchPayments(paymentsPage + 1, paymentsTypeFilter, paymentsUserFilter);
-                            }}
-                          >
-                            {t("common.next")}
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    <Pagination
+                      page={paymentsPage}
+                      totalPages={paymentsTotalPages}
+                      onPageChange={(p) => {
+                        setPaymentsPage(p);
+                        fetchPayments(p, paymentsTypeFilter, paymentsUserFilter);
+                      }}
+                    />
                   </div>
                 )}
               </div>

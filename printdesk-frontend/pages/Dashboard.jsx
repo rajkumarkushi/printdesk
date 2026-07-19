@@ -5,6 +5,9 @@ import { useTranslation } from "react-i18next";
 import billoraLogo from "../src/assets/billora.png";
 import ThemeToggle from "../src/components/ThemeToggle";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import { downloadBlob } from "../utils/downloadBlob";
+import { openRazorpayCheckout as checkoutPlan, openRazorpayInvoiceCheckout as checkoutInvoice } from "../services/razorpay";
+import Pagination from "../components/Pagination";
 
 function Dashboard() {
   const [invoices, setInvoices] = useState([]);
@@ -109,15 +112,8 @@ function Dashboard() {
 
   const handleDownload = async (id) => {
     try {
-      const response = await API.get(`/invoices/${id}/pdf`, {
-        responseType: "blob",
-      });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `invoice-${id}.pdf`);
-      document.body.appendChild(link);
-      link.click();
+      const response = await API.get(`/invoices/${id}/pdf`, { responseType: "blob" });
+      downloadBlob(response, `invoice-${id}.pdf`);
     } catch (error) {
       alert(t("dashboard.errDownload"));
     }
@@ -598,35 +594,11 @@ function Dashboard() {
               </tbody>
             </table>
           </div>
-          {totalPages > 1 && (
-            <div className="d-flex justify-content-between align-items-center px-4 py-3 border-top">
-              <small className="text-soft">
-                {t("common.page")} {page} {t("common.of")} {totalPages}
-              </small>
-              <div className="d-flex gap-2">
-                <button
-                  className="btn btn-sm btn-outline-secondary"
-                  disabled={page === 1}
-                  onClick={() => {
-                    setPage(page - 1);
-                    fetchInvoices(page - 1);
-                  }}
-                >
-                  {t("common.previous")}
-                </button>
-                <button
-                  className="btn btn-sm btn-outline-secondary"
-                  disabled={page === totalPages}
-                  onClick={() => {
-                    setPage(page + 1);
-                    fetchInvoices(page + 1);
-                  }}
-                >
-                  {t("common.next")}
-                </button>
-              </div>
-            </div>
-          )}
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={(p) => { setPage(p); fetchInvoices(p); }}
+          />
         </div>
       </main>
 
