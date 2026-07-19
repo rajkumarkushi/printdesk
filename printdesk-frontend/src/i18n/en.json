@@ -215,6 +215,8 @@
   "admin.email": "Email",
   "admin.plan": "Plan",
   "admin.invoiceLimit": "Invoice Limit",
+  "admin.invoicesUsed": "Used",
+  "admin.invoicesRemaining": "Remaining",
   "admin.created": "Created",
   "admin.actions": "Actions",
   "admin.empty": "No users found matching your filters.",

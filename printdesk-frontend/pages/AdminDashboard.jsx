@@ -501,21 +501,23 @@ function AdminDashboard() {
             </div>
           </div>
           <div className="table-responsive">
-            <table className="table table-hover align-middle mb-0">
+            <table className="table table-hover align-middle mb-0" style={{ minWidth: 900 }}>
               <thead>
                 <tr>
-                  <th>{t("admin.business")}</th>
-                  <th>{t("admin.email")}</th>
-                  <th>{t("admin.plan")}</th>
-                  <th>{t("admin.invoiceLimit")}</th>
-                  <th>{t("admin.created")}</th>
-                  <th className="text-center">{t("admin.actions")}</th>
+                  <th style={{ minWidth: 140 }}>{t("admin.business")}</th>
+                  <th style={{ minWidth: 180 }}>{t("admin.email")}</th>
+                  <th className="text-center" style={{ minWidth: 80 }}>{t("admin.plan")}</th>
+                  <th className="text-center" style={{ minWidth: 100 }}>{t("admin.invoiceLimit")}</th>
+                  <th className="text-center" style={{ minWidth: 70 }}>{t("admin.invoicesUsed")}</th>
+                  <th className="text-center" style={{ minWidth: 90 }}>{t("admin.invoicesRemaining")}</th>
+                  <th style={{ minWidth: 100 }}>{t("admin.created")}</th>
+                  <th className="text-center" style={{ minWidth: 260 }}>{t("admin.actions")}</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredUsers.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="text-center text-soft py-5">
+                    <td colSpan={8} className="text-center text-soft py-5">
                       <div className="empty-state">
                         <div className="empty-state-icon">&#128100;</div>
                         <p className="mb-0">{t("admin.empty")}</p>
@@ -535,11 +537,16 @@ function AdminDashboard() {
                   };
                   const pc = planColors[normalisedPlan] || planColors.free;
 
+                  const usagePercent =
+                    user.usageLimit && user.usageUsed != null
+                      ? Math.min(Math.round((user.usageUsed / user.usageLimit) * 100), 100)
+                      : null;
+
                   return (
                     <tr key={user._id}>
-                      <td className="fw-semibold">{user.businessName}</td>
-                      <td className="text-soft">{user.email}</td>
-                      <td>
+                      <td className="fw-semibold" style={{ whiteSpace: "nowrap" }}>{user.businessName}</td>
+                      <td className="text-soft" style={{ whiteSpace: "nowrap" }}>{user.email}</td>
+                      <td className="text-center">
                         <span
                           style={{
                             display: "inline-block",
@@ -550,45 +557,75 @@ function AdminDashboard() {
                             color: pc.color,
                             background: pc.bg,
                             textTransform: "capitalize",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           {normalisedPlan}
                         </span>
                       </td>
-                      <td>{displayLimit}</td>
-                      <td className="text-soft">
+                      <td className="text-center fw-semibold">{displayLimit}</td>
+                      <td className="text-center">
+                        <span className="fw-semibold">{user.usageUsed != null ? user.usageUsed : "-"}</span>
+                      </td>
+                      <td className="text-center">
+                        {normalisedPlan === "pro" ? (
+                          <span className="text-soft">{t("admin.unlimited")}</span>
+                        ) : user.usageRemaining != null ? (
+                          <span
+                            className="fw-semibold"
+                            style={{
+                              color:
+                                usagePercent !== null && usagePercent >= 90
+                                  ? "var(--danger)"
+                                  : usagePercent !== null && usagePercent >= 70
+                                  ? "var(--warning)"
+                                  : "var(--success)",
+                            }}
+                          >
+                            {user.usageRemaining}
+                          </span>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td className="text-soft" style={{ whiteSpace: "nowrap" }}>
                         {user.createdAt
                           ? new Date(user.createdAt).toLocaleDateString()
                           : "-"}
                       </td>
-                      <td className="text-center">
-                        <div className="d-flex flex-wrap gap-2 justify-content-center">
+                      <td>
+                        <div className="d-flex flex-wrap gap-1 justify-content-center">
                           <button
                             className="btn btn-sm btn-outline-success"
+                            title="Download Summary PDF"
                             onClick={() => handleDownloadUserSummaryPdf(user)}
                           >
                             {t("common.pdf")}
                           </button>
                           <button
                             className="btn btn-sm btn-outline-secondary"
+                            title="Edit User"
                             onClick={() => openEditUser(user)}
                           >
                             {t("common.edit")}
                           </button>
                           <button
                             className="btn btn-sm btn-outline-primary"
+                            title="View Invoices"
                             onClick={() => openInvoicesModal(user)}
                           >
                             {t("admin.invoices")}
                           </button>
                           <button
                             className="btn btn-sm btn-outline-info"
+                            title="View Payments"
                             onClick={() => openUserPaymentsModal(user)}
                           >
                             {t("admin.payments")}
                           </button>
                           <button
                             className="btn btn-sm btn-outline-danger"
+                            title="Delete User"
                             onClick={() => handleDeleteUser(user._id)}
                           >
                             {t("common.delete")}

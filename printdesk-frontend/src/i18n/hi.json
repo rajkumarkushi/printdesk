@@ -215,6 +215,8 @@
   "admin.email": "ईमेल",
   "admin.plan": "प्लान",
   "admin.invoiceLimit": "चालान सीमा",
+  "admin.invoicesUsed": "उपयोग किया",
+  "admin.invoicesRemaining": "शेष",
   "admin.created": "बनाया गया",
   "admin.actions": "क्रियाएं",
   "admin.empty": "आपके फ़िल्टर से मेल खाते कोई उपयोगकर्ता नहीं मिले।",

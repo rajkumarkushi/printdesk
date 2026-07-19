@@ -215,6 +215,8 @@
   "admin.email": "ఇమెయిల్",
   "admin.plan": "ప్లాన్",
   "admin.invoiceLimit": "ఇన్వాయిస్ పరిమితి",
+  "admin.invoicesUsed": "ఉపయోగించిన",
+  "admin.invoicesRemaining": "మిగిలిన",
   "admin.created": "సృష్టించబడింది",
   "admin.actions": "చర్యలు",
   "admin.empty": "మీ ఫిల్టర్లకు సరిపోలే వినియోగదారులు కనుగొనబడలేదు.",

@@ -7,6 +7,7 @@ const Invoice = require("../models/Invoice");
 const Payment = require("../models/Payment");
 const { generateInvoicePdf, PAGE_WIDTH_PT } = require("../utils/invoicePdfTemplate");
 const { parsePagination } = require("../utils/pagination");
+const { getStartOfMonth } = require("../utils/invoiceHelpers");
 
 // =====================
 // GET ADMIN STATS
@@ -98,8 +99,45 @@ exports.getAllUsers = async (req, res) => {
       Business.countDocuments(baseUserQuery),
     ]);
 
+    const startOfMonth = getStartOfMonth();
+
+    const usersWithUsage = await Promise.all(
+      users.map(async (user) => {
+        const u = user.toObject();
+        const plan = (u.plan || "free").toLowerCase();
+        const overrideLimit = typeof u.invoiceLimit === "number" ? u.invoiceLimit : null;
+
+        if (plan === "pro") {
+          const used = await Invoice.countDocuments({
+            businessId: u._id,
+            createdAt: { $gte: startOfMonth },
+          });
+          u.usageUsed = used;
+          u.usageLimit = null;
+          u.usageRemaining = null;
+        } else if (plan === "basic") {
+          const used = await Invoice.countDocuments({
+            businessId: u._id,
+            createdAt: { $gte: startOfMonth },
+          });
+          const limit = overrideLimit ?? 200;
+          u.usageUsed = used;
+          u.usageLimit = limit;
+          u.usageRemaining = Math.max(limit - used, 0);
+        } else {
+          const used = await Invoice.countDocuments({ businessId: u._id });
+          const limit = overrideLimit ?? 30;
+          u.usageUsed = used;
+          u.usageLimit = limit;
+          u.usageRemaining = Math.max(limit - used, 0);
+        }
+
+        return u;
+      })
+    );
+
     res.json({
-      users,
+      users: usersWithUsage,
       total,
       page,
       totalPages: Math.ceil(total / limit),

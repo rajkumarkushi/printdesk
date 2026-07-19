@@ -772,6 +772,21 @@ footer {
   backdrop-filter: blur(12px);
 }
 
+.admin-table-wrapper .table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--panel, #fff);
+  z-index: 1;
+}
+
+.admin-table-wrapper .table tbody td {
+  white-space: nowrap;
+}
+
+.admin-table-wrapper .table tbody td:last-child {
+  white-space: normal;
+}
+
 .filter-bar {
   border-radius: var(--radius);
   border: 1px solid var(--line);
